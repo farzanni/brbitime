@@ -1,16 +1,20 @@
 export const SERVICES = [
-  { id: "haircut", name: "اصلاح مو", price: "۳۵۰٬۰۰۰ تومان", duration: "۴۵ دقیقه" },
-  { id: "beard", name: "اصلاح ریش", price: "۲۰۰٬۰۰۰ تومان", duration: "۳۰ دقیقه" },
-  { id: "combo", name: "مو + ریش", price: "۵۰۰٬۰۰۰ تومان", duration: "۶۰ دقیقه" },
+  { id: "haircut", name: "اصلاح مو", price: "۴۰۰٬۰۰۰ تومان", duration: "۳۰ دقیقه" },
+  { id: "beard", name: "اصلاح ریش", price: "۱۰۰٬۰۰۰ تومان", duration: "۱۰ دقیقه" },
+  { id: "combo", name: "مو + ریش", price: "۴۵۰٬۰۰۰ تومان", duration: "۴۰ دقیقه" },
 ] as const;
 
 export const TIME_SLOTS = [
-  "۱۰:۰۰",
-  "۱۱:۰۰",
-  "۱۲:۰۰",
-  "۱۴:۰۰",
   "۱۵:۰۰",
+  "۱۵:۳۰",
   "۱۶:۰۰",
+  "۱۶:۳۰",
+  "۱۷:۰۰",
+  "۱۷:۳۰",
+  "۱۸:۰۰",
+  "۱۸:۳۰",
+  "۱۹:۰۰",
+  "۱۹:۳۰",
 ] as const;
 
 export function iranToday() {
