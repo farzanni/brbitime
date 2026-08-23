@@ -24,6 +24,7 @@ Postgres, and the Telegram Bot API. Fully RTL / Persian-first.
 | `ADMIN_SESSION_SECRET` | ✅ | Any long random string (signs the session cookie) |
 | `TELEGRAM_BOT_TOKEN` | optional | Bot token for booking alerts |
 | `TELEGRAM_CHAT_ID` | optional | Chat that receives booking alerts |
+| `TELEGRAM_TARGETS` | optional | Comma-separated `BOT_TOKEN:CHAT_ID` pairs — every target gets pinged (owner + operator). Takes priority over the single pair above. |
 | `NEXT_PUBLIC_APP_URL` | optional | Public URL, used for the admin link inside alerts |
 
 ## Database schema
