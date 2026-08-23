@@ -1,11 +1,40 @@
 import { SERVICES } from "@/lib/booking";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID ?? "";
-
 const SERVICE_NAMES: Record<string, string> = Object.fromEntries(
   SERVICES.map((service) => [service.id, service.name]),
 );
+
+type Target = { token: string; chatId: string };
+
+/**
+ * Notification targets. Preferred form (supports many shops / owners):
+ *   TELEGRAM_TARGETS="BOT_TOKEN:CHAT_ID,BOT_TOKEN:CHAT_ID"
+ *
+ * Falls back to the classic single-shop pair:
+ *   TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+ */
+function getTargets(): Target[] {
+  const raw = process.env.TELEGRAM_TARGETS ?? "";
+
+  const parsed = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separatorIndex = entry.indexOf(":");
+      if (separatorIndex === -1) return null;
+      const token = entry.slice(0, separatorIndex).trim();
+      const chatId = entry.slice(separatorIndex + 1).trim();
+      return token && chatId ? { token, chatId } : null;
+    })
+    .filter((target): target is Target => target !== null);
+
+  if (parsed.length > 0) return parsed;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN ?? "";
+  const chatId = process.env.TELEGRAM_CHAT_ID ?? "";
+  return token && chatId ? [{ token, chatId }] : [];
+}
 
 function escapeHtml(value: string) {
   return value
@@ -15,7 +44,8 @@ function escapeHtml(value: string) {
 }
 
 /**
- * Sends a booking notification to the shop owner's Telegram.
+ * Sends a booking notification to every configured Telegram target
+ * (shop owner, operator, ...).
  * Never throws — a failed notification must not fail a confirmed booking.
  */
 export async function notifyBooking(input: {
@@ -26,8 +56,10 @@ export async function notifyBooking(input: {
   name: string;
   phone: string;
 }): Promise<void> {
-  if (!BOT_TOKEN || !CHAT_ID) {
-    console.warn("telegram notification skipped: credentials not configured");
+  const targets = getTargets();
+
+  if (targets.length === 0) {
+    console.warn("telegram notification skipped: no targets configured");
     return;
   }
 
@@ -44,25 +76,33 @@ export async function notifyBooking(input: {
     manageLink,
   ].join("\n");
 
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text,
-          parse_mode: "HTML",
-        }),
-        signal: AbortSignal.timeout(8000),
-      },
-    );
+  await Promise.allSettled(
+    targets.map(async ({ token, chatId }) => {
+      try {
+        const response = await fetch(
+          `https://api.telegram.org/bot${token}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text,
+              parse_mode: "HTML",
+            }),
+            signal: AbortSignal.timeout(8000),
+          },
+        );
 
-    if (!response.ok) {
-      console.error("telegram notification failed:", await response.text());
-    }
-  } catch (error) {
-    console.error("telegram notification error:", error);
-  }
+        if (!response.ok) {
+          console.error(
+            "telegram notification failed:",
+            chatId.slice(0, 4),
+            await response.text(),
+          );
+        }
+      } catch (error) {
+        console.error("telegram notification error:", error);
+      }
+    }),
+  );
 }
