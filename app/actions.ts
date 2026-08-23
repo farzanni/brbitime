@@ -125,3 +125,25 @@ export async function cancelAppointment(formData: FormData) {
 
   revalidatePath("/admin");
 }
+
+const PUBLIC_ID_PATTERN =
+  /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+/** Customer cancels their own booking via their private success-page link. */
+export async function cancelMyBooking(formData: FormData) {
+  const publicId = String(formData.get("publicId") ?? "");
+
+  if (!PUBLIC_ID_PATTERN.test(publicId)) {
+    redirect("/");
+  }
+
+  await getSql()`
+    UPDATE appointments
+    SET status = 'cancelled'
+    WHERE public_id = ${publicId}
+      AND status = 'booked'
+  `;
+
+  revalidatePath("/admin");
+  redirect(`/success?id=${publicId}&cancelled=1`);
+}
