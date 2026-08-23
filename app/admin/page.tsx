@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { SERVICES, iranToday } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
 import {
@@ -57,6 +57,7 @@ export default async function AdminPage({
     );
   }
 
+  const sql = getSql();
   const appointments = (await sql`
     SELECT
       id,

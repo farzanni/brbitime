@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { iranToday } from "@/lib/booking";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET(request: Request) {
 
 
 
+  const sql = getSql();
   const rows = await sql`
     SELECT appointment_time
     FROM appointments

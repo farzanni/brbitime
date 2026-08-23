@@ -15,14 +15,16 @@ export default function BookingForm({
 }) {
   const [date, setDate] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [availability, setAvailability] = useState<{
+    date: string;
+    times: string[];
+  }>({ date: "", times: [] });
   const [loading, setLoading] = useState(false);
 
+  const bookedTimes = availability.date === date ? availability.times : [];
+
   useEffect(() => {
-    if (!date) {
-      setBookedTimes([]);
-      return;
-    }
+    if (!date) return;
 
     const controller = new AbortController();
 
@@ -41,7 +43,7 @@ export default function BookingForm({
         if (!response.ok) return;
 
         const data = await response.json();
-        setBookedTimes(data.bookedTimes);
+        setAvailability({ date, times: data.bookedTimes });
       } finally {
         setLoading(false);
       }

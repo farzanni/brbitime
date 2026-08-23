@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { SERVICES, TIME_SLOTS, iranToday } from "@/lib/booking";
 import {
   adminPasswordMatches,
@@ -11,6 +11,7 @@ import {
   createAdminSession,
   isAdmin,
 } from "@/lib/admin";
+import { notifyBooking } from "@/lib/notify";
 
 function normalizeDigits(value: string) {
   const persian = "۰۱۲۳۴۵۶۷۸۹";
@@ -45,6 +46,7 @@ export async function bookAppointment(formData: FormData) {
   const publicId = randomUUID();
 
   try {
+    const sql = getSql();
     await sql`
       INSERT INTO appointments (
         public_id,
@@ -74,6 +76,16 @@ export async function bookAppointment(formData: FormData) {
   }
 
   revalidatePath("/admin");
+
+  await notifyBooking({
+    publicId,
+    service,
+    date,
+    time,
+    name,
+    phone,
+  });
+
   redirect(`/success?id=${publicId}`);
 }
 
@@ -104,7 +116,7 @@ export async function cancelAppointment(formData: FormData) {
     return;
   }
 
-  await sql`
+  await getSql()`
     UPDATE appointments
     SET status = 'cancelled'
     WHERE id = ${id}

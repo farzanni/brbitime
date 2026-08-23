@@ -24,9 +24,22 @@ export default async function Home({
 
         <BookingForm error={error} minDate={iranToday()} />
 
-      </div>
-      <div className="mt-4 flex gap-4 text-sm text-neutral-400">
-        <a href={`tel:${SHOP.phone}`}>تماس</a>
+        <footer className="mt-10 flex items-center justify-center gap-6 border-t border-neutral-900 pt-6 text-sm text-neutral-400">
+          <a href={`tel:${SHOP.phone}`} className="hover:text-white">
+            📞 تماس
+          </a>
+
+          {SHOP.instagram && (
+            <a
+              href={`https://instagram.com/${SHOP.instagram}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white"
+            >
+              📷 اینستاگرام
+            </a>
+          )}
+        </footer>
       </div>
     </main>
   );
