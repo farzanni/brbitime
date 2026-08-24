@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { SHOP } from "@/lib/shop";
 import "./globals.css";
 
+const rawAppUrl =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+const appUrl = /^https?:\/\//i.test(rawAppUrl) ? rawAppUrl : `https://${rawAppUrl}`;
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
-  ),
+  metadataBase: new URL(appUrl),
   title: {
     default: `${SHOP.name} — رزرو آنلاین نوبت`,
     template: `%s | ${SHOP.name}`,
