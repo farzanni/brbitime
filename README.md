@@ -1,4 +1,8 @@
-# brbitime — رزرو آنلاین آرایشگاه
+# 💈 brbitime — رزرو آنلاین آرایشگاه
+
+**🔴 Live:** [brbitime.vercel.app](https://brbitime.vercel.app)
+
+![brbitime booking flow](docs/img/screenshot-hero.png)
 
 Booking page for barbershops and salons in Iran. Customers pick a service,
 a day (Persian calendar), and a time slot; the owner gets an instant
