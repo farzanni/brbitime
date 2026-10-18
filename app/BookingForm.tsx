@@ -6,13 +6,7 @@ import "@daypicker/react/style.css";
 import { bookAppointment } from "./actions";
 import { SERVICES, TIME_SLOTS } from "@/lib/booking";
 
-export default function BookingForm({
-  error,
-  minDate,
-}: {
-  error?: string;
-  minDate: string;
-}) {
+export default function BookingForm({ minDate }: { minDate: string }) {
   const [date, setDate] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [availability, setAvailability] = useState<{
@@ -56,18 +50,6 @@ export default function BookingForm({
 
   return (
     <>
-      {error === "slot-taken" && (
-        <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/40 p-4 text-sm">
-          این ساعت همین الان توسط شخص دیگری رزرو شد. ساعت دیگری انتخاب کن.
-        </div>
-      )}
-
-      {error === "invalid" && (
-        <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/40 p-4 text-sm">
-          اطلاعات واردشده معتبر نیست.
-        </div>
-      )}
-
       <form action={bookAppointment} className="space-y-10">
         <section>
           <h2 className="mb-4 text-lg font-semibold">۱. انتخاب خدمت</h2>

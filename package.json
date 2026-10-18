@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "perf:guard": "node scripts/perf-guard.mjs"
   },
   "dependencies": {
     "@daypicker/persian": "^10.0.1",
