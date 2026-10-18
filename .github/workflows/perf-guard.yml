@@ -1,0 +1,51 @@
+name: perf-guard
+
+# Guards the regressions that actually cost brbitime's users: the homepage
+# slipping back to dynamic rendering, functions drifting out of fra1, and
+# /api/availability going back to no-store. See PERF.md for the measurements
+# behind each assertion.
+#
+# Note on the TTFB budget: the number that justified this work was measured from
+# Iran. A CI runner sits next to Vercel's edge and will pass any budget, so the
+# budget is relaxed here (PERF_TTFB_BUDGET_MS) and the cache/region assertions
+# carry the signal. Real-network TTFB is a manual, Iran-side measurement.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Daily, so a config drift that no push caused still surfaces.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # On a push, Vercel's own deploy is still running when this job starts, so
+      # retry rather than asserting against the previous deployment.
+      - name: Check production
+        env:
+          PERF_TTFB_BUDGET_MS: "5000"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "::group::attempt $attempt"
+            if node scripts/perf-guard.mjs https://brbitime.vercel.app; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" -lt 5 ]; then
+              echo "retrying in 45s to let the deployment settle"
+              sleep 45
+            fi
+          done
+          echo "perf guard failed after 5 attempts" >&2
+          exit 1

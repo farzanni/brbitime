@@ -15,7 +15,14 @@
  */
 
 const BASE = (process.argv[2] ?? "https://brbitime.vercel.app").replace(/\/$/, "");
-const TTFB_BUDGET_MS = 1200;
+
+/**
+ * TTFB budget. Overridable because the budget only means something when the
+ * check runs from Iran: a CI runner in Europe or the US sits next to Vercel's
+ * edge and will pass any budget, so those environments should relax it and rely
+ * on the cache/region assertions instead.
+ */
+const TTFB_BUDGET_MS = Number(process.env.PERF_TTFB_BUDGET_MS ?? 1200);
 
 const results = [];
 let failed = 0;
@@ -43,6 +50,17 @@ async function timedFetch(url, init) {
   return { response, body, ms: performance.now() - started };
 }
 
+/**
+ * Vercel's cache statuses on a healthy deployment:
+ *   HIT    — served from the edge cache
+ *   STALE  — past the revalidate window, served from cache while revalidating
+ *            in the background (normal ISR behaviour, still no cold wait)
+ *   PRERENDER — served from the prerender cache right after a deploy
+ *   MISS   — the edge did not cache it; this is the regression
+ */
+const CACHED_STATUSES = ["HIT", "STALE", "PRERENDER"];
+const isCached = (status) => CACHED_STATUSES.includes(status);
+
 // --- 1. Homepage is edge-cached (static/ISR), not a function call per visit ---
 // NOTE: Vercel rewrites the Cache-Control header of an ISR response to
 // `public, max-age=0, must-revalidate` and consumes the s-maxage directive
@@ -59,8 +77,8 @@ check(
   `x-nextjs-prerender: ${homePrerender || "(none)"} — a missing value means the route went dynamic again`,
 );
 check(
-  "homepage served from the edge cache on repeat view",
-  homeVercelCache === "HIT",
+  "homepage served from the edge cache, not rendered per request",
+  isCached(homeVercelCache),
   `x-vercel-cache: ${homeVercelCache || "(none)"} (Cache-Control: ${homeCache || "(none)"})`,
 );
 check(
@@ -101,7 +119,7 @@ const availabilityVercelId = availability.response.headers.get("x-vercel-id") ??
 
 check(
   "availability is edge-cached (no-store would show MISS forever)",
-  availabilityVercelCache === "HIT",
+  isCached(availabilityVercelCache),
   `x-vercel-cache: ${availabilityVercelCache || "(none)"} (first request: ${
     (availabilityCold.response.headers.get("x-vercel-cache") ?? "?").toUpperCase()
   })`,

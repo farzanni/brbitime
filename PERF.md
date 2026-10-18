@@ -86,6 +86,41 @@ Observable infrastructure facts that back this up:
 | Lazy-load `@daypicker/persian` (73KB chunk) | — | **not attempted** | LCP was already 1.0s at Perf 99, and the calendar is above the fold on first paint — deferring it would delay the primary UI |
 | Trim the 71KB "unused JavaScript" | — | **not attempted** | Same: no measured user-facing problem to fix |
 | Judge the work by the Lighthouse score | 98 → 98 | **rejected metric** | Simulated throttling is blind to region and edge-cache changes; it would have reverted a real win |
+| Add an index for the availability lookup | — | **not attempted** | The plan already shows `Index Only Scan` on `unique_booked_slot` at 0.90ms; a second index would tax every write for nothing |
+| Add an index for the admin list | — | **not attempted** | Already an `Index Scan` with no `Sort` node (0.03ms); the index order matches the `ORDER BY` |
+| Enforce the guard in CI | — | **added** | A guard nothing runs is documentation, not a guard |
+
+## Backend: query plans (no change needed)
+
+The skill's rule is "read the plan before adding an index". Both queries were
+already covered by the existing partial unique index
+`unique_booked_slot (appointment_date, appointment_time) WHERE status = 'booked'`,
+verified with `EXPLAIN (ANALYZE, BUFFERS)` against the production database:
+
+| Query | Plan | Execution |
+| --- | --- | --- |
+| Availability lookup (hot path) | `Index Only Scan using unique_booked_slot` — `Heap Fetches: 0` | **0.90ms** |
+| Admin list | `Index Scan using unique_booked_slot`, **no `Sort` node** | **0.03ms** |
+
+Two things worth recording:
+
+- The index is shaped exactly for both queries: `appointment_date` is the
+  equality column for the availability lookup and the range column for the admin
+  list, and `(appointment_date, appointment_time)` matches the admin `ORDER BY`,
+  so the sort is free. **No index was added** — a second one would be pure
+  write-tax on every booking.
+- The database accounts for roughly **1ms inside a 655ms request**. It was never
+  the bottleneck, which independently confirms that the region/edge work was
+  aimed at the right layer rather than at query tuning.
+
+Re-verify with:
+
+```bash
+set -a && . ./.env.production.local && set +a
+psql "$DATABASE_URL_UNPOOLED" -c "EXPLAIN (ANALYZE, BUFFERS, COSTS OFF)
+  SELECT appointment_time FROM appointments
+  WHERE appointment_date = '2026-10-22' AND status = 'booked';"
+```
 
 ## Guarding against regression
 
@@ -96,13 +131,27 @@ in `fra1`, and availability is still edge-cached (a `no-store` endpoint shows
 server-rendered HTML. Run it after any routing, caching, or deployment-config
 change.
 
-Two notes on writing guards against Vercel:
+It is wired into CI as `.github/workflows/perf-guard.yml` — on pushes to `main`,
+daily on a schedule (so config drift no push caused still surfaces), and on
+manual dispatch. On a push the job retries up to 5 times because Vercel's own
+deploy is still running when it starts.
+
+Three notes on writing guards against Vercel — each of these was a real
+false-positive found by running the guard against a known-good site:
 
 - Vercel rewrites an ISR response's `Cache-Control` to
   `public, max-age=0, must-revalidate` and consumes `s-maxage` itself — assert on
   `x-vercel-cache` / `x-nextjs-prerender`, not the literal header.
+- `x-vercel-cache: STALE` is **healthy** (the ISR entry is past its revalidate
+  window and is being served from cache while revalidating in the background).
+  Accept `HIT`, `STALE`, and `PRERENDER`; only `MISS` is the regression.
 - `x-vercel-id` is `lhr1::fra1::req-id` when a function ran and `lhr1::req-id`
   when the edge served it from cache. Only the three-segment form names a region.
+
+The TTFB budget is relaxed in CI (`PERF_TTFB_BUDGET_MS=5000`): a runner sits next
+to Vercel's edge and would pass any budget, so the cache and region assertions
+carry the signal there. The real-network budget is a manual, Iran-side
+measurement.
 
 ## Re-measuring
 
