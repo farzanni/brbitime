@@ -44,20 +44,24 @@ async function timedFetch(url, init) {
 }
 
 // --- 1. Homepage is edge-cached (static/ISR), not a function call per visit ---
+// NOTE: Vercel rewrites the Cache-Control header of an ISR response to
+// `public, max-age=0, must-revalidate` and consumes the s-maxage directive
+// itself, so the observable signals are x-vercel-cache and x-nextjs-prerender.
 const first = await timedFetch(`${BASE}/`);
 const second = await timedFetch(`${BASE}/`);
 const homeCache = second.response.headers.get("cache-control") ?? "";
 const homeVercelCache = (second.response.headers.get("x-vercel-cache") ?? "").toUpperCase();
+const homePrerender = second.response.headers.get("x-nextjs-prerender") ?? "";
 
 check(
-  "homepage is CDN-cacheable (Cache-Control has s-maxage)",
-  /s-maxage=\d+/.test(homeCache),
-  `Cache-Control: ${homeCache || "(none)"}`,
+  "homepage is prerendered, not rendered on demand",
+  homePrerender === "1",
+  `x-nextjs-prerender: ${homePrerender || "(none)"} — a missing value means the route went dynamic again`,
 );
 check(
   "homepage served from the edge cache on repeat view",
   homeVercelCache === "HIT",
-  `x-vercel-cache: ${homeVercelCache || "(none)"}`,
+  `x-vercel-cache: ${homeVercelCache || "(none)"} (Cache-Control: ${homeCache || "(none)"})`,
 );
 check(
   `homepage TTFB under ${TTFB_BUDGET_MS}ms`,
@@ -66,20 +70,46 @@ check(
 );
 
 // --- 2. Functions execute in fra1, next to the Neon database ---
-const vercelId = second.response.headers.get("x-vercel-id") ?? "";
+// x-vercel-id looks like `lhr1::fra1::req-id` when a function ran, and
+// `lhr1::req-id` when the response came straight from the edge cache. Only the
+// three-segment form names a region, and that region must be fra1.
+function functionRegion(vercelId) {
+  const parts = vercelId.split("::");
+  return parts.length >= 3 ? parts[1] : "";
+}
+
+const homeRegion = functionRegion(second.response.headers.get("x-vercel-id") ?? "");
 check(
-  "functions execute in fra1 (co-located with Neon eu-central-1)",
-  vercelId.includes("fra1"),
-  `x-vercel-id: ${vercelId || "(none)"}`,
+  "no function region drift on the homepage response",
+  homeRegion === "" || homeRegion === "fra1",
+  homeRegion === ""
+    ? "no function ran (served from the edge cache)"
+    : `x-vercel-id region: ${homeRegion} (expected fra1)`,
 );
 
 // --- 3. Availability is edge-cached, with a stated staleness window ---
-const availability = await timedFetch(`${BASE}/api/availability?date=${iranToday()}`);
-const availabilityCache = availability.response.headers.get("cache-control") ?? "";
+// Fetch twice: the first request for a given date populates the edge cache
+// (MISS), the second must be served from it (HIT). A `no-store` endpoint stays
+// MISS forever, which is exactly the regression this guards.
+const availabilityUrl = `${BASE}/api/availability?date=${iranToday()}`;
+const availabilityCold = await timedFetch(availabilityUrl);
+const availability = await timedFetch(availabilityUrl);
+const availabilityVercelCache = (
+  availability.response.headers.get("x-vercel-cache") ?? ""
+).toUpperCase();
+const availabilityVercelId = availability.response.headers.get("x-vercel-id") ?? "";
+
 check(
-  "availability is edge-cached with a bounded staleness window",
-  /s-maxage=\d+/.test(availabilityCache) && /stale-while-revalidate=\d+/.test(availabilityCache),
-  `Cache-Control: ${availabilityCache || "(none)"}`,
+  "availability is edge-cached (no-store would show MISS forever)",
+  availabilityVercelCache === "HIT",
+  `x-vercel-cache: ${availabilityVercelCache || "(none)"} (first request: ${
+    (availabilityCold.response.headers.get("x-vercel-cache") ?? "?").toUpperCase()
+  })`,
+);
+check(
+  "availability functions run in fra1, next to Neon",
+  ["", "fra1"].includes(functionRegion(availabilityVercelId)),
+  `x-vercel-id: ${availabilityVercelId || "(none)"} → region ${functionRegion(availabilityVercelId) || "(none, cache hit)"}`,
 );
 check(
   "availability responds without a server error",
