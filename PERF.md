@@ -89,6 +89,7 @@ Observable infrastructure facts that back this up:
 | Add an index for the availability lookup | — | **not attempted** | The plan already shows `Index Only Scan` on `unique_booked_slot` at 0.90ms; a second index would tax every write for nothing |
 | Add an index for the admin list | — | **not attempted** | Already an `Index Scan` with no `Sort` node (0.03ms); the index order matches the `ORDER BY` |
 | Enforce the guard in CI | — | **added** | A guard nothing runs is documentation, not a guard |
+| Add RUM / `web-vitals` field monitoring | — | **deferred** | 6 bookings ever, all from the author's own phone, none in 2 months — a p75 over zero real sessions is the author's browser dressed up as field data. Trigger documented in PERF.md |
 
 ## Backend: query plans (no change needed)
 
@@ -121,6 +122,39 @@ psql "$DATABASE_URL_UNPOOLED" -c "EXPLAIN (ANALYZE, BUFFERS, COSTS OFF)
   SELECT appointment_time FROM appointments
   WHERE appointment_date = '2026-10-22' AND status = 'booked';"
 ```
+
+## Field monitoring (RUM): deferred, with a trigger
+
+Step 5 asks for two layers — a synthetic CI gate and field monitoring. The CI
+gate exists (`.github/workflows/perf-guard.yml`) and guards the metric that
+justified this work (real-network TTFB, plus the structural assertions). Field
+monitoring is deliberately **not** built yet, on evidence:
+
+The production database holds **6 appointments in its entire history**, all
+created between 2026-08-15 and 2026-08-24, and every one of them from the same
+phone number under test names. There have been no bookings in the two months
+since. **The site has no real users yet.**
+
+A RUM p75 computed over zero real sessions measures the developer's own browser
+and presents it as field data — worse than no data, because it looks like
+evidence.
+
+**Trigger to add it:** real traffic. Concretely, once the appointments table
+shows bookings from more than a handful of distinct phone numbers spread across
+several weeks, wire up `web-vitals` reporting. The measurement that will matter
+then is p75 LCP / INP / TTFB for real Iranian sessions, because that is the
+population every decision in this document was made for.
+
+Two notes for whoever does it:
+
+- Vercel Speed Insights beacons same-origin (`/_vercel/speed-insights/`), so it
+  is not blocked in Iran the way a third-party analytics domain would be.
+- Whatever the choice, do not store an identifier alongside the metric. A
+  performance sample needs a page path and the metric, nothing more.
+
+Until then, the synthetic CI gate is the right level of investment: it catches
+the structural regressions — dynamic rendering, region drift, cache bypass —
+which do not need traffic to detect.
 
 ## Guarding against regression
 
