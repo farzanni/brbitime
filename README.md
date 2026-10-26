@@ -4,8 +4,8 @@
 
 ![brbitime booking flow](docs/img/screenshot-hero.png)
 
-Booking page for barbershops and salons in Iran. Customers pick a service,
-a day (Persian calendar), and a time slot; the owner gets an instant
+Online appointment booking platform for salons and barbershops. Customers pick a service,
+a day, and a time slot; the owner gets an instant
 Telegram notification and manages bookings from a password-protected panel.
 
 Built with Next.js (App Router), React 19, Tailwind CSS 4, Neon serverless
