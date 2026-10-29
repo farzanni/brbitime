@@ -1,8 +1,6 @@
-export const SERVICES = [
-  { id: "haircut", name: "اصلاح مو", price: "۴۰۰٬۰۰۰ تومان", duration: "۳۰ دقیقه" },
-  { id: "beard", name: "اصلاح ریش", price: "۱۰۰٬۰۰۰ تومان", duration: "۱۰ دقیقه" },
-  { id: "combo", name: "مو + ریش", price: "۴۵۰٬۰۰۰ تومان", duration: "۴۰ دقیقه" },
-] as const;
+import { DEFAULT_SERVICES, type ServiceItem } from "@/lib/shop";
+
+export const SERVICES: readonly ServiceItem[] = DEFAULT_SERVICES;
 
 export const TIME_SLOTS = [
   "۱۵:۰۰",

@@ -12,6 +12,7 @@ import {
   isAdmin,
 } from "@/lib/admin";
 import { notifyBooking } from "@/lib/notify";
+import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from "@/lib/shop";
 
 function normalizeDigits(value: string) {
   const persian = "۰۱۲۳۴۵۶۷۸۹";
@@ -29,6 +30,7 @@ export async function bookAppointment(formData: FormData) {
   const time = String(formData.get("time") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const phone = normalizeDigits(String(formData.get("phone") ?? ""));
+  const birthday = normalizeDigits(String(formData.get("birthday") ?? "").trim());
 
   const valid =
     SERVICES.some((item) => item.id === service) &&
@@ -54,7 +56,8 @@ export async function bookAppointment(formData: FormData) {
         appointment_date,
         appointment_time,
         customer_name,
-        phone
+        phone,
+        customer_birthday
       )
       VALUES (
         ${publicId},
@@ -62,7 +65,8 @@ export async function bookAppointment(formData: FormData) {
         ${date},
         ${time},
         ${name},
-        ${phone}
+        ${phone},
+        ${birthday || null}
       )
     `;
   } catch (error) {
@@ -146,4 +150,127 @@ export async function cancelMyBooking(formData: FormData) {
 
   revalidatePath("/admin");
   redirect(`/success?id=${publicId}&cancelled=1`);
+}
+
+/** Admin: Update General Shop & Content settings */
+export async function updateShopSettings(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const instagram = String(formData.get("instagram") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const birthdayPromoText = String(formData.get("birthdayPromoText") ?? "").trim();
+
+  await saveShopConfig({
+    ...(name && { name }),
+    ...(phone && { phone }),
+    instagram,
+    address,
+    ...(birthdayPromoText && { birthdayPromoText }),
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin?tab=content&saved=1");
+}
+
+/** Admin: Add or edit a product */
+export async function saveProduct(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const id = String(formData.get("id") ?? randomUUID().slice(0, 8));
+  const title = String(formData.get("title") ?? "").trim();
+  const price = String(formData.get("price") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const tag = String(formData.get("tag") ?? "").trim();
+
+  if (!title || !price) {
+    redirect("/admin?tab=content&error=missing-fields");
+  }
+
+  const current = await getShopConfig();
+  const existingIdx = current.products.findIndex((p) => p.id === id);
+  const updatedItem: ProductItem = { id, title, price, description, tag };
+
+  let newProducts = [...current.products];
+  if (existingIdx >= 0) {
+    newProducts[existingIdx] = updatedItem;
+  } else {
+    newProducts.push(updatedItem);
+  }
+
+  await saveShopConfig({ products: newProducts });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin?tab=content&saved=1");
+}
+
+/** Admin: Delete product */
+export async function deleteProduct(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const id = String(formData.get("id") ?? "");
+  const current = await getShopConfig();
+  const filtered = current.products.filter((p) => p.id !== id);
+
+  await saveShopConfig({ products: filtered });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin?tab=content&saved=1");
+}
+
+/** Admin: Add or edit an event */
+export async function saveEvent(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const id = String(formData.get("id") ?? randomUUID().slice(0, 8));
+  const title = String(formData.get("title") ?? "").trim();
+  const date = String(formData.get("date") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const tag = String(formData.get("tag") ?? "").trim();
+
+  if (!title || !date) {
+    redirect("/admin?tab=content&error=missing-fields");
+  }
+
+  const current = await getShopConfig();
+  const existingIdx = current.events.findIndex((e) => e.id === id);
+  const updatedItem: EventItem = { id, title, date, description, tag };
+
+  let newEvents = [...current.events];
+  if (existingIdx >= 0) {
+    newEvents[existingIdx] = updatedItem;
+  } else {
+    newEvents.push(updatedItem);
+  }
+
+  await saveShopConfig({ events: newEvents });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin?tab=content&saved=1");
+}
+
+/** Admin: Delete event */
+export async function deleteEvent(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const id = String(formData.get("id") ?? "");
+  const current = await getShopConfig();
+  const filtered = current.events.filter((e) => e.id !== id);
+
+  await saveShopConfig({ events: filtered });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin?tab=content&saved=1");
 }

@@ -7,8 +7,16 @@ const rawAppUrl =
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 const appUrl = /^https?:\/\//i.test(rawAppUrl) ? rawAppUrl : `https://${rawAppUrl}`;
 
+function getSafeBaseUrl(url: string): URL {
+  try {
+    return new URL(url);
+  } catch {
+    return new URL("http://localhost:3000");
+  }
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: getSafeBaseUrl(appUrl),
   title: {
     default: `${SHOP.name} — رزرو آنلاین نوبت`,
     template: `%s | ${SHOP.name}`,
