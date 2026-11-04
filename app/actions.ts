@@ -13,6 +13,7 @@ import {
 } from "@/lib/admin";
 import { notifyBooking, notifyCancellation } from "@/lib/notify";
 import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from "@/lib/shop";
+import { parseBirthday } from "@/lib/birthday";
 
 
 export async function bookAppointment(formData: FormData) {
@@ -21,7 +22,8 @@ export async function bookAppointment(formData: FormData) {
   const time = String(formData.get("time") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const phone = normalizeDigits(String(formData.get("phone") ?? ""));
-  const birthday = normalizeDigits(String(formData.get("birthday") ?? "").trim());
+  const rawBirthday = String(formData.get("birthday") ?? "").trim();
+  const birthday = parseBirthday(rawBirthday)?.normalized ?? null;
 
   const valid =
     SERVICES.some((item) => item.id === service) &&
@@ -297,7 +299,8 @@ export async function deleteEvent(formData: FormData) {
 export async function registerCustomer(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const phone = normalizeDigits(String(formData.get("phone") ?? ""));
-  const birthday = normalizeDigits(String(formData.get("birthday") ?? "").trim());
+  const rawBirthday = String(formData.get("birthday") ?? "").trim();
+  const birthday = parseBirthday(rawBirthday)?.normalized ?? null;
 
   if (!/^09\d{9}$/.test(phone) || name.length < 2) {
     return { success: false, error: "شماره موبایل یا نام معتبر نیست." };

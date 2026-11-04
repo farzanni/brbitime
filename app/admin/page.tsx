@@ -2,6 +2,7 @@ import { getSql } from "@/lib/db";
 import { SERVICES, iranToday } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
 import { getShopConfig } from "@/lib/shop";
+import { checkBirthdayStatus } from "@/lib/birthday";
 import {
   cancelAppointment,
   loginAdmin,
@@ -271,12 +272,28 @@ export default async function AdminPage({
                             </a>
                           </div>
 
-                          {appointment.customer_birthday && (
-                            <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
-                              <Gift className="h-3.5 w-3.5 text-amber-400" />
-                              <span>تولد مشتری: {appointment.customer_birthday}</span>
-                            </div>
-                          )}
+                          {(() => {
+                            const bStatus = appointment.customer_birthday
+                              ? checkBirthdayStatus(appointment.customer_birthday, appointment.appointment_date)
+                              : null;
+                            if (!bStatus) return null;
+
+                            if (bStatus.isBirthdayWeek) {
+                              return (
+                                <div className="flex items-center gap-1.5 rounded-xl border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs text-purple-200 font-bold animate-pulse">
+                                  <Sparkles className="h-3.5 w-3.5 text-purple-300" />
+                                  <span>🎂 هفته تولد مشتری ({bStatus.formattedDate}) — شامل ۵۰٪ تخفیف</span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="flex items-center gap-2 rounded-xl bg-neutral-850 border border-neutral-800 px-2.5 py-1 text-xs text-neutral-300">
+                                <Gift className="h-3.5 w-3.5 text-purple-400" />
+                                <span>تولد مشتری: {bStatus.formattedDate}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <form action={cancelAppointment}>
@@ -354,12 +371,35 @@ export default async function AdminPage({
                       </div>
                     </div>
 
-                    {c.birthday && (
-                      <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
-                        <Gift className="h-3.5 w-3.5 text-amber-400" />
-                        <span>تاریخ تولد: {c.birthday}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const bStatus = c.birthday ? checkBirthdayStatus(c.birthday) : null;
+                      if (!bStatus) return null;
+
+                      if (bStatus.isBirthdayWeek) {
+                        return (
+                          <div className="flex items-center gap-1.5 rounded-xl border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs text-purple-200 font-bold animate-pulse">
+                            <Sparkles className="h-3.5 w-3.5 text-purple-300" />
+                            <span>🎂 هفته تولد مشتری ({bStatus.formattedDate}) — ۵۰٪ تخفیف</span>
+                          </div>
+                        );
+                      }
+
+                      if (bStatus.isBirthdayMonth) {
+                        return (
+                          <div className="flex items-center gap-2 rounded-xl bg-purple-500/10 border border-purple-500/25 px-3 py-1.5 text-xs text-purple-300">
+                            <Gift className="h-3.5 w-3.5 text-purple-400" />
+                            <span>متولد این ماه: {bStatus.formattedDate}</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center gap-2 rounded-xl bg-neutral-850 border border-neutral-800 px-3 py-1.5 text-xs text-neutral-300">
+                          <Gift className="h-3.5 w-3.5 text-neutral-400" />
+                          <span>تاریخ تولد: {bStatus.formattedDate}</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Barber Notes Form */}
                     <form action={updateCustomerNote} className="space-y-2 border-t border-neutral-800/80 pt-3">

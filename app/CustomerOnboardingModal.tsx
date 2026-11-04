@@ -19,6 +19,7 @@ import {
 } from "@/lib/customerCache";
 import { normalizeDigits } from "@/lib/booking";
 import { registerCustomer } from "./actions";
+import BirthdayPicker from "./BirthdayPicker";
 
 interface Props {
   onProfileLoaded?: (profile: CustomerProfile) => void;
@@ -352,12 +353,9 @@ export default function CustomerOnboardingModal({
                 </div>
 
                 <div>
-                  <input
-                    type="text"
-                    placeholder="مثال: ۱۳۷۴/۰۶/۱۵ یا روز و ماه"
+                  <BirthdayPicker
                     value={birthdayInput}
-                    onChange={(e) => setBirthdayInput(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.12] bg-[#0c0c0c] p-3.5 text-sm text-white placeholder-neutral-600 outline-none transition focus:border-white focus:ring-1 focus:ring-white"
+                    onChange={(val) => setBirthdayInput(val)}
                   />
                 </div>
 

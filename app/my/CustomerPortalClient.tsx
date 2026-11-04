@@ -17,7 +17,9 @@ import {
   Gift,
   Trash2,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
+import { checkBirthdayStatus } from "@/lib/birthday";
 import {
   getCustomerPortalData,
   cancelCustomerAppointment,
@@ -305,12 +307,28 @@ export default function CustomerPortalClient({
                     </div>
                   ) : null}
 
-                  {data?.customer?.birthday && (
-                    <div className="flex items-center gap-1.5 rounded-xl border border-purple-500/25 bg-purple-500/10 px-3 py-2 text-xs text-purple-200 font-medium">
-                      <Gift className="h-3.5 w-3.5 text-purple-400" />
-                      <span>تخفیف تولد فعال</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const bStatus = data?.customer?.birthday
+                      ? checkBirthdayStatus(data.customer.birthday)
+                      : null;
+                    if (!bStatus) return null;
+
+                    if (bStatus.isBirthdayWeek) {
+                      return (
+                        <div className="flex items-center gap-1.5 rounded-xl border border-purple-500/40 bg-purple-500/20 px-3 py-2 text-xs text-purple-200 font-bold shadow-[0_0_15px_rgba(168,85,247,0.25)]">
+                          <Sparkles className="h-4 w-4 text-purple-300 animate-pulse" />
+                          <span>هفته تولد شما ({bStatus.formattedDate}) — ۵۰٪ تخفیف فعال</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-neutral-300 font-medium">
+                        <Gift className="h-3.5 w-3.5 text-purple-400" />
+                        <span>تولد: {bStatus.formattedDate}</span>
+                      </div>
+                    );
+                  })()}
 
                   <button
                     onClick={() => loadData(phone)}

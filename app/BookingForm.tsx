@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   Edit3,
   UserPlus,
+  Sparkles,
 } from "lucide-react";
+import { checkBirthdayStatus } from "@/lib/birthday";
 import CustomerOnboardingModal from "./CustomerOnboardingModal";
 
 export default function BookingForm({ minDate }: { minDate: string }) {
@@ -134,16 +136,30 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                     ({profile.phone})
                   </span>
                 </div>
-                {profile.birthday ? (
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-300">
-                    <Gift className="h-3.5 w-3.5 text-white" />
-                    <span>تاریخ تولد: {profile.birthday} (شامل ۵۰٪ تخفیف هفته تولد)</span>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-neutral-500">
-                    تاریخ تولد ثبت نشده است.
-                  </p>
-                )}
+                {(() => {
+                  const bStatus = profile.birthday ? checkBirthdayStatus(profile.birthday, date || undefined) : null;
+                  if (bStatus?.discountEligible) {
+                    return (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-xs text-purple-300 font-bold">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-400 animate-pulse" />
+                        <span>تولد شما ({bStatus.formattedDate}): 🎉 ۵۰٪ تخفیف هفته تولد برای این نوبت فعال شد!</span>
+                      </div>
+                    );
+                  }
+                  if (profile.birthday) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-xs text-neutral-300">
+                        <Gift className="h-3.5 w-3.5 text-purple-400" />
+                        <span>تاریخ تولد: {bStatus?.formattedDate || profile.birthday} (شامل ۵۰٪ تخفیف هفته تولد)</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-neutral-500">
+                      تاریخ تولد ثبت نشده است.
+                    </p>
+                  );
+                })()}
               </div>
 
               <button
