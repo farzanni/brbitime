@@ -1,5 +1,5 @@
 import { type GalleryItem } from "@/lib/shop";
-import { Camera, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Camera, Sparkles } from "lucide-react";
 
 export default function GallerySection({ gallery }: { gallery: GalleryItem[] }) {
   if (!gallery || gallery.length === 0) return null;

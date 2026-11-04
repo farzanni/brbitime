@@ -1,5 +1,5 @@
 import { type EventItem } from "@/lib/shop";
-import { Clock, Calendar, Sparkles, ChevronLeft } from "lucide-react";
+import { Clock, Calendar, Sparkles } from "lucide-react";
 
 export default function EventsSection({ events }: { events: EventItem[] }) {
   return (
@@ -31,7 +31,7 @@ export default function EventsSection({ events }: { events: EventItem[] }) {
         />
 
         <div className="space-y-6">
-          {events.map((event, index) => (
+          {events.map((event) => (
             <div
               key={event.id}
               className="group relative flex items-start gap-4 transition"

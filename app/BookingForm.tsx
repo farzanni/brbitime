@@ -32,20 +32,9 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Customer state
-  const [profile, setProfile] = useState<CustomerProfile>({
-    name: "",
-    phone: "",
-    birthday: "",
-    isSubscribed: false,
-  });
+  // Customer state initialized from client cache
+  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Load profile from customer cache on mount
-  useEffect(() => {
-    const current = getSavedCustomerProfile();
-    setProfile(current);
-  }, []);
 
   const handleProfileLoaded = (updated: CustomerProfile) => {
     setProfile(updated);

@@ -224,7 +224,7 @@ export async function saveProduct(formData: FormData) {
   const existingIdx = current.products.findIndex((p) => p.id === id);
   const updatedItem: ProductItem = { id, title, price, description, tag };
 
-  let newProducts = [...current.products];
+  const newProducts = [...current.products];
   if (existingIdx >= 0) {
     newProducts[existingIdx] = updatedItem;
   } else {
@@ -273,7 +273,7 @@ export async function saveEvent(formData: FormData) {
   const existingIdx = current.events.findIndex((e) => e.id === id);
   const updatedItem: EventItem = { id, title, date, description, tag };
 
-  let newEvents = [...current.events];
+  const newEvents = [...current.events];
   if (existingIdx >= 0) {
     newEvents[existingIdx] = updatedItem;
   } else {

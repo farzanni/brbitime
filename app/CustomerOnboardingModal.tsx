@@ -30,20 +30,17 @@ export default function CustomerOnboardingModal({
   isOpenExternal,
   onCloseExternal,
 }: Props) {
-  const [profile, setProfile] = useState<CustomerProfile>({
-    name: "",
-    phone: "",
-    birthday: "",
-    isSubscribed: false,
-  });
+  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInternalOpen, setIsInternalOpen] = useState(false);
   const [showGreetingToast, setShowGreetingToast] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [birthdayInput, setBirthdayInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const isModalOpen = isOpenExternal !== undefined ? isOpenExternal : isInternalOpen;
 
   function normalizeDigits(val: string) {
     const persian = "۰۱۲۳۴۵۶۷۸۹";
@@ -54,35 +51,35 @@ export default function CustomerOnboardingModal({
       .replace(/[\s-]/g, "");
   }
 
-  // Check subscription status on mount
+  // On client mount: check if subscribed or needs onboarding
   useEffect(() => {
     const current = getSavedCustomerProfile();
-    setProfile(current);
-    if (onProfileLoaded) onProfileLoaded(current);
-
     if (current.isSubscribed && current.name && current.phone) {
-      // User has already subscribed -> Show small greeting popup
-      setShowGreetingToast(true);
-      const timer = setTimeout(() => setShowGreetingToast(false), 7000);
-      return () => clearTimeout(timer);
+      const showTimer = setTimeout(() => setShowGreetingToast(true), 0);
+      const hideTimer = setTimeout(() => setShowGreetingToast(false), 7000);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     } else {
-      // User hasn't subscribed yet -> Pop up onboarding modal
-      setIsModalOpen(true);
+      const openTimer = setTimeout(() => setIsInternalOpen(true), 0);
+      return () => clearTimeout(openTimer);
     }
   }, []);
 
-  // Listen to external open trigger (e.g. from "Edit info" button)
-  useEffect(() => {
-    if (isOpenExternal !== undefined) {
-      setIsModalOpen(isOpenExternal);
-      if (isOpenExternal) {
-        setPhoneInput(profile.phone || "");
-        setNameInput(profile.name || "");
-        setBirthdayInput(profile.birthday || "");
-        setStep(1);
-      }
-    }
-  }, [isOpenExternal]);
+  // Update inputs whenever modal opens
+  const openModalForEditing = () => {
+    setPhoneInput(profile.phone || "");
+    setNameInput(profile.name || "");
+    setBirthdayInput(profile.birthday || "");
+    setStep(1);
+    setIsInternalOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsInternalOpen(false);
+    if (onCloseExternal) onCloseExternal();
+  };
 
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +116,7 @@ export default function CustomerOnboardingModal({
 
       await registerCustomer(formData);
 
-      const updated = {
+      const updated: CustomerProfile = {
         phone: cleanPhone,
         name: cleanName,
         birthday: cleanBirthday,
@@ -130,10 +127,8 @@ export default function CustomerOnboardingModal({
       setProfile(updated);
       if (onProfileLoaded) onProfileLoaded(updated);
 
-      setIsModalOpen(false);
-      if (onCloseExternal) onCloseExternal();
+      handleClose();
 
-      // Show greeting after subscribing
       setShowGreetingToast(true);
       setTimeout(() => setShowGreetingToast(false), 6000);
     });
@@ -163,11 +158,7 @@ export default function CustomerOnboardingModal({
             <button
               onClick={() => {
                 setShowGreetingToast(false);
-                setPhoneInput(profile.phone);
-                setNameInput(profile.name);
-                setBirthdayInput(profile.birthday);
-                setStep(1);
-                setIsModalOpen(true);
+                openModalForEditing();
               }}
               className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-neutral-200 hover:border-white/40 hover:bg-white/10 transition"
             >

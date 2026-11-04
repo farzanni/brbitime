@@ -1,5 +1,5 @@
 import { type ProductItem } from "@/lib/shop";
-import { Sparkles, Check, ArrowUpLeft } from "lucide-react";
+import { Sparkles, Check } from "lucide-react";
 
 export default function ProductsSection({ products }: { products: ProductItem[] }) {
   return (
