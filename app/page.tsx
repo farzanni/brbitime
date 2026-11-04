@@ -27,21 +27,21 @@ export default async function Home() {
       {/* 1. Floating Glassy Navbar on Scroll */}
       <GlassyHeader phone={shop.phone} shopName={shop.name} />
 
-      {/* 2. High-end Marble Background Light Effects */}
+      {/* 2. Seamless Full-width Faded Hero Section (No boxes) */}
+      <HeroSection
+        name={shop.name}
+        tagline={shop.tagline}
+        address={shop.address}
+        phone={shop.phone}
+      />
+
+      {/* 3. High-end Marble Background Light Effects */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/[0.08] via-white/[0.01] to-transparent blur-3xl" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-12">
-        {/* 3. Classy Landing Hero Section */}
-        <HeroSection
-          name={shop.name}
-          tagline={shop.tagline}
-          address={shop.address}
-          phone={shop.phone}
-        />
-
+      <div className="relative mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 space-y-12">
         {/* 4. Main Content Grid (Mobile First: Timeline -> Products -> Booking) */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
           {/* Timeline of Events (Mobile: 1st under hero / Desktop: Left column) */}
