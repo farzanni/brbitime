@@ -28,3 +28,17 @@ export function iranToday() {
 
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
+
+/**
+ * Normalizes Persian and Arabic numerals to standard Latin digits,
+ * stripping extraneous spaces and hyphens.
+ */
+export function normalizeDigits(value: string): string {
+  const persian = "۰۱۲۳۴۵۶۷۸۹";
+  const arabic = "٠١٢٣٤٥٦٧٨٩";
+
+  return value
+    .replace(/[۰-۹]/g, (d) => String(persian.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(arabic.indexOf(d)))
+    .replace(/[\s-]/g, "");
+}

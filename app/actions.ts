@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSql } from "@/lib/db";
-import { SERVICES, TIME_SLOTS, iranToday } from "@/lib/booking";
+import { SERVICES, TIME_SLOTS, iranToday, normalizeDigits } from "@/lib/booking";
 import {
   adminPasswordMatches,
   clearAdminSession,
@@ -14,15 +14,6 @@ import {
 import { notifyBooking } from "@/lib/notify";
 import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from "@/lib/shop";
 
-function normalizeDigits(value: string) {
-  const persian = "۰۱۲۳۴۵۶۷۸۹";
-  const arabic = "٠١٢٣٤٥٦٧٨٩";
-
-  return value
-    .replace(/[۰-۹]/g, (d) => String(persian.indexOf(d)))
-    .replace(/[٠-٩]/g, (d) => String(arabic.indexOf(d)))
-    .replace(/[\s-]/g, "");
-}
 
 export async function bookAppointment(formData: FormData) {
   const service = String(formData.get("service") ?? "");

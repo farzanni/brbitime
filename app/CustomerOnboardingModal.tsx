@@ -17,6 +17,7 @@ import {
   saveCustomerProfile,
   type CustomerProfile,
 } from "@/lib/customerCache";
+import { normalizeDigits } from "@/lib/booking";
 import { registerCustomer } from "./actions";
 
 interface Props {
@@ -42,14 +43,6 @@ export default function CustomerOnboardingModal({
 
   const isModalOpen = isOpenExternal !== undefined ? isOpenExternal : isInternalOpen;
 
-  function normalizeDigits(val: string) {
-    const persian = "۰۱۲۳۴۵۶۷۸۹";
-    const arabic = "٠١٢٣٤٥٦٧٨٩";
-    return val
-      .replace(/[۰-۹]/g, (d) => String(persian.indexOf(d)))
-      .replace(/[٠-٩]/g, (d) => String(arabic.indexOf(d)))
-      .replace(/[\s-]/g, "");
-  }
 
   // On client mount: check if subscribed or needs onboarding
   useEffect(() => {

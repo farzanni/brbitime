@@ -17,13 +17,27 @@ function getProvider(): SmsProvider {
   return "mock";
 }
 
+async function sendKavenegarSms(apiKey: string, receptor: string, message: string, sender?: string) {
+  const params = new URLSearchParams({
+    receptor,
+    message,
+    ...(sender && { sender }),
+  });
+  return fetch(`https://api.kavenegar.com/v1/${apiKey}/sms/send.json`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+}
+
 /**
- * Send booking confirmation SMS to the customer and alert SMS to the barber.
- * Never throws — SMS failure must never break user booking.
+ * Sends booking confirmation SMS to customer and notification to barber.
+ * Never throws — SMS failure must never fail a confirmed booking.
  */
 export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> {
   const provider = getProvider();
   const shopName = SHOP.name || "سالن پیرایش";
+  const sender = process.env.SMS_SENDER;
 
   const customerMessage = `سلام ${payload.customerName} عزیز، نوبت شما در ${shopName} برای خدمت ${payload.serviceName} در تاریخ ${payload.date} ساعت ${payload.time} با موفقیت ثبت شد.`;
   const barberMessage = `نوبت جدید: ${payload.customerName} | ${payload.serviceName} | ${payload.date} ساعت ${payload.time} | تماس: ${payload.customerPhone}`;
@@ -34,7 +48,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
       const template = process.env.KAVENEGAR_PATTERN_BOOKING;
 
       if (template) {
-        // Fast Verify Lookup API (passes through blacklisted DND numbers)
+        // Fast Verify Lookup API (passes blacklist/DND)
         const params = new URLSearchParams({
           receptor: payload.customerPhone,
           token: payload.customerName.replace(/\s+/g, "."),
@@ -44,39 +58,19 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
         });
         await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`);
       } else {
-        // Standard SMS API
-        const params = new URLSearchParams({
-          receptor: payload.customerPhone,
-          message: customerMessage,
-          ...(process.env.SMS_SENDER && { sender: process.env.SMS_SENDER }),
-        });
-        await fetch(`https://api.kavenegar.com/v1/${apiKey}/sms/send.json`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: params.toString(),
-        });
+        await sendKavenegarSms(apiKey, payload.customerPhone, customerMessage, sender);
       }
 
-      // Notify Barber Phone if configured
+      // Notify Barber
       if (SHOP.phone && SHOP.phone !== payload.customerPhone) {
-        const barberParams = new URLSearchParams({
-          receptor: SHOP.phone,
-          message: barberMessage,
-          ...(process.env.SMS_SENDER && { sender: process.env.SMS_SENDER }),
-        });
-        await fetch(`https://api.kavenegar.com/v1/${apiKey}/sms/send.json`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: barberParams.toString(),
-        });
+        await sendKavenegarSms(apiKey, SHOP.phone, barberMessage, sender);
       }
     } else if (provider === "farazsms") {
       const apiKey = process.env.FARAZSMS_API_KEY || process.env.IPPANEL_API_KEY || "";
       const patternCode = process.env.FARAZSMS_PATTERN_BOOKING;
-      const originPhone = process.env.SMS_SENDER || "+983000505";
+      const originPhone = sender || "+983000505";
 
       if (patternCode) {
-        // Pattern API (passes blacklist)
         await fetch("https://edge.ippanel.com/api/v1/pattern/send", {
           method: "POST",
           headers: {
@@ -96,7 +90,6 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
           }),
         });
       } else {
-        // Simple FarazSMS / IPPanel Send
         await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
           method: "POST",
           headers: {
@@ -111,15 +104,10 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
         });
       }
     } else {
-      // Mock / Dev mode fallback (no API key configured)
-      console.log("-----------------------------------------");
-      console.log(`[SMS DEV MOCK] To Customer (${payload.customerPhone}):`);
-      console.log(customerMessage);
+      console.log(`[SMS MOCK] Customer (${payload.customerPhone}): ${customerMessage}`);
       if (SHOP.phone) {
-        console.log(`[SMS DEV MOCK] To Barber (${SHOP.phone}):`);
-        console.log(barberMessage);
+        console.log(`[SMS MOCK] Barber (${SHOP.phone}): ${barberMessage}`);
       }
-      console.log("-----------------------------------------");
     }
   } catch (err) {
     console.error("SMS notification failed:", err);
