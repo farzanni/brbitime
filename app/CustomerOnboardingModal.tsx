@@ -74,6 +74,19 @@ export default function CustomerOnboardingModal({
     if (onCloseExternal) onCloseExternal();
   };
 
+  // Keyboard accessibility: Close on Escape
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsInternalOpen(false);
+        if (onCloseExternal) onCloseExternal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen, onCloseExternal]);
+
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = normalizeDigits(phoneInput);
@@ -170,7 +183,14 @@ export default function CustomerOnboardingModal({
 
       {/* 2. Onboarding Modal (Phone -> Name -> Birthday Discount) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClose();
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-in fade-in duration-200"
+        >
           <div
             dir="rtl"
             className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/[0.12] bg-[#090909] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] sm:p-7"

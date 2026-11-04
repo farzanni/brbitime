@@ -202,7 +202,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                     type="radio"
                     name="service"
                     value={service.id}
-                    className="h-4 w-4 accent-white cursor-pointer"
+                    className="h-4 w-4 accent-white cursor-pointer focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                   />
                   <div>
                     <p className="text-xs font-bold text-white transition group-hover:text-white">
@@ -295,7 +295,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                       className="peer sr-only"
                     />
 
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-[#0c0c0c] p-3 text-center transition-all duration-200 hover:border-white/30 peer-checked:border-white peer-checked:bg-white peer-checked:text-black peer-checked:shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                    <div className="flex min-h-[48px] flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-[#0c0c0c] p-3 text-center transition-all duration-200 hover:border-white/30 peer-focus-visible:ring-2 peer-focus-visible:ring-white peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black peer-checked:border-white peer-checked:bg-white peer-checked:text-black peer-checked:shadow-[0_0_15px_rgba(255,255,255,0.3)]">
                       <span className="font-mono text-xs font-bold">{time}</span>
                       {booked ? (
                         <span className="mt-1 text-[9px] text-neutral-500">رزرو شده</span>
