@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import BrandLogo from "./BrandLogo";
 import { MapPin, Clock, ShieldCheck, ArrowDown, Scissors, Sparkles, User } from "lucide-react";
 
@@ -16,11 +17,14 @@ export default function HeroSection({
     <section className="relative overflow-hidden rounded-3xl border border-white/[0.12] bg-[#070707] shadow-[0_20px_60px_rgba(0,0,0,0.9)]">
       {/* Background Photography with Luxury Obsidian Marble Filter */}
       <div className="absolute inset-0 z-0">
-        <img
+        <Image
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1600&q=80"
           alt="Muu Cut Salon Interior"
-          className="h-full w-full object-cover object-center opacity-30 filter grayscale contrast-125 scale-105"
-          loading="eager"
+          fill
+          priority
+          sizes="(max-width: 1200px) 100vw, 1200px"
+          quality={80}
+          className="object-cover object-center opacity-30 filter grayscale contrast-125 scale-105 pointer-events-none select-none"
         />
         {/* Deep dark gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#070707] via-[#070707]/80 to-[#070707]/60" />

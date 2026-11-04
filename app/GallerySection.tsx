@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { type GalleryItem } from "@/lib/shop";
 import { Camera, Sparkles } from "lucide-react";
 
@@ -36,12 +37,12 @@ export default function GallerySection({ gallery }: { gallery: GalleryItem[] }) 
           >
             {/* Image Container */}
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-900">
-              <img
+              <Image
                 src={item.imageUrl}
                 alt={item.title}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover object-center filter grayscale contrast-110 transition-transform duration-500 group-hover:scale-105 group-hover:grayscale-0"
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="object-cover object-center filter grayscale contrast-110 transition-transform duration-500 group-hover:scale-105 group-hover:grayscale-0"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 

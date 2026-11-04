@@ -94,6 +94,16 @@ export default function CustomerPortalClient({
     };
   }, [phone]);
 
+  // Keyboard accessibility: Close cancel dialog on Escape
+  useEffect(() => {
+    if (!cancellingAppt) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCancellingAppt(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [cancellingAppt]);
+
   async function loadData(targetPhone: string) {
     setIsLoading(true);
     setActionMessage(null);
@@ -231,13 +241,17 @@ export default function CustomerPortalClient({
 
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div className="relative">
+                <label htmlFor="customer-phone-input" className="sr-only">
+                  شماره موبایل
+                </label>
                 <input
+                  id="customer-phone-input"
                   type="tel"
                   dir="ltr"
                   value={inputPhone}
                   onChange={(e) => setInputPhone(e.target.value)}
                   placeholder="09123456789"
-                  className="w-full rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3.5 text-center font-mono text-base tracking-wider text-white placeholder-neutral-500 shadow-inner focus:border-white/40 focus:bg-white/[0.08] focus:outline-none transition"
+                  className="w-full rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3.5 text-center font-mono text-base tracking-wider text-white placeholder-neutral-500 shadow-inner focus:border-white/40 focus:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-white focus:outline-none transition"
                   autoFocus
                 />
               </div>
@@ -311,10 +325,12 @@ export default function CustomerPortalClient({
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-2 border-b border-white/[0.08] pb-1">
+            <div role="tablist" aria-label="مدیریت نوبت‌ها" className="flex gap-2 border-b border-white/[0.08] pb-1">
               <button
+                role="tab"
+                aria-selected={activeTab === "upcoming"}
                 onClick={() => setActiveTab("upcoming")}
-                className={`relative px-4 py-2.5 text-sm font-bold transition ${
+                className={`relative px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-xl ${
                   activeTab === "upcoming"
                     ? "text-white"
                     : "text-neutral-400 hover:text-neutral-200"
@@ -330,8 +346,10 @@ export default function CustomerPortalClient({
               </button>
 
               <button
+                role="tab"
+                aria-selected={activeTab === "history"}
                 onClick={() => setActiveTab("history")}
-                className={`relative px-4 py-2.5 text-sm font-bold transition ${
+                className={`relative px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-xl ${
                   activeTab === "history"
                     ? "text-white"
                     : "text-neutral-400 hover:text-neutral-200"
