@@ -1,4 +1,5 @@
 import { SERVICES } from "@/lib/booking";
+import { sendBookingSms } from "@/lib/sms";
 
 const SERVICE_NAMES: Record<string, string> = Object.fromEntries(
   SERVICES.map((service) => [service.id, service.name]),
@@ -76,33 +77,44 @@ export async function notifyBooking(input: {
     manageLink,
   ].join("\n");
 
-  await Promise.allSettled(
-    targets.map(async ({ token, chatId }) => {
-      try {
-        const response = await fetch(
-          `https://api.telegram.org/bot${token}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text,
-              parse_mode: "HTML",
-            }),
-            signal: AbortSignal.timeout(8000),
-          },
-        );
+  const serviceTitle = SERVICE_NAMES[input.service] ?? input.service;
 
-        if (!response.ok) {
-          console.error(
-            "telegram notification failed:",
-            chatId.slice(0, 4),
-            await response.text(),
-          );
-        }
-      } catch (error) {
-        console.error("telegram notification error:", error);
+  // Send SMS to customer & barber (runs in background without throwing)
+  const smsPromise = sendBookingSms({
+    customerName: input.name,
+    customerPhone: input.phone,
+    serviceName: serviceTitle,
+    date: input.date,
+    time: input.time,
+  });
+
+  const telegramPromises = targets.map(async ({ token, chatId }) => {
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: "HTML",
+          }),
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "telegram notification failed:",
+          chatId.slice(0, 4),
+          await response.text(),
+        );
       }
-    }),
-  );
+    } catch (error) {
+      console.error("telegram notification error:", error);
+    }
+  });
+
+  await Promise.allSettled([smsPromise, ...telegramPromises]);
 }

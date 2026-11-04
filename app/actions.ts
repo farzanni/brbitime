@@ -69,6 +69,33 @@ export async function bookAppointment(formData: FormData) {
         ${birthday || null}
       )
     `;
+
+    // Upsert customer master record and track visits
+    await sql`
+      INSERT INTO customers (
+        phone,
+        name,
+        birthday,
+        total_visits,
+        last_visit_at,
+        updated_at
+      )
+      VALUES (
+        ${phone},
+        ${name},
+        ${birthday || null},
+        1,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (phone) DO UPDATE
+      SET
+        name = EXCLUDED.name,
+        birthday = COALESCE(EXCLUDED.birthday, customers.birthday),
+        total_visits = customers.total_visits + 1,
+        last_visit_at = NOW(),
+        updated_at = NOW()
+    `;
   } catch (error) {
     const dbError = error as { code?: string };
 
@@ -274,3 +301,67 @@ export async function deleteEvent(formData: FormData) {
   revalidatePath("/admin");
   redirect("/admin?tab=content&saved=1");
 }
+
+/** Register or update customer from onboarding modal */
+export async function registerCustomer(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const phone = normalizeDigits(String(formData.get("phone") ?? ""));
+  const birthday = normalizeDigits(String(formData.get("birthday") ?? "").trim());
+
+  if (!/^09\d{9}$/.test(phone) || name.length < 2) {
+    return { success: false, error: "شماره موبایل یا نام معتبر نیست." };
+  }
+
+  const sql = getSql();
+  await sql`
+    INSERT INTO customers (
+      phone,
+      name,
+      birthday,
+      total_visits,
+      last_visit_at,
+      updated_at
+    )
+    VALUES (
+      ${phone},
+      ${name},
+      ${birthday || null},
+      0,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (phone) DO UPDATE
+    SET
+      name = EXCLUDED.name,
+      birthday = COALESCE(EXCLUDED.birthday, customers.birthday),
+      updated_at = NOW()
+  `;
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Admin: Update notes for a customer */
+export async function updateCustomerNote(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const phone = String(formData.get("phone") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!phone) {
+    redirect("/admin?tab=customers");
+  }
+
+  const sql = getSql();
+  await sql`
+    UPDATE customers
+    SET notes = ${notes}, updated_at = NOW()
+    WHERE phone = ${phone}
+  `;
+
+  revalidatePath("/admin");
+  redirect("/admin?tab=customers&saved=1");
+}
+

@@ -14,7 +14,7 @@
  * Exit code 0 = all good, 1 = at least one guard failed.
  */
 
-const BASE = (process.argv[2] ?? "https://brbitime.vercel.app").replace(/\/$/, "");
+const BASE = (process.argv[2] ?? "https://muucut.ir").replace(/\/$/, "");
 
 /**
  * TTFB budget. Overridable because the budget only means something when the

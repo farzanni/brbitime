@@ -11,11 +11,13 @@ import {
   deleteProduct,
   saveEvent,
   deleteEvent,
+  updateCustomerNote,
 } from "../actions";
 import {
   Calendar,
   Clock,
   User,
+  Users,
   Phone,
   Gift,
   Settings,
@@ -26,6 +28,7 @@ import {
   LogOut,
   Scissors,
   CheckCircle,
+  FileText,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +41,17 @@ type Appointment = {
   customer_name: string;
   phone: string;
   customer_birthday?: string | null;
+};
+
+type Customer = {
+  id: number;
+  phone: string;
+  name: string;
+  birthday: string | null;
+  notes: string | null;
+  total_visits: number;
+  last_visit_at: string | null;
+  created_at: string;
 };
 
 export default async function AdminPage({
@@ -107,6 +121,20 @@ export default async function AdminPage({
     ORDER BY appointment_date, appointment_time
   `) as Appointment[];
 
+  const customers = (await sql`
+    SELECT
+      id,
+      phone,
+      name,
+      birthday,
+      notes,
+      total_visits,
+      last_visit_at,
+      created_at
+    FROM customers
+    ORDER BY last_visit_at DESC NULLS LAST, id DESC
+  `) as Customer[];
+
   const shop = await getShopConfig();
 
   return (
@@ -145,7 +173,7 @@ export default async function AdminPage({
         </div>
 
         {/* Tab Navigation */}
-        <div className="mb-8 flex gap-2 border-b border-neutral-800 pb-3">
+        <div className="mb-8 flex flex-wrap gap-2 border-b border-neutral-800 pb-3">
           <a
             href="/admin?tab=appointments"
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
@@ -156,6 +184,18 @@ export default async function AdminPage({
           >
             <Calendar className="h-4 w-4" />
             نوبت‌ها و رزروها ({appointments.length})
+          </a>
+
+          <a
+            href="/admin?tab=customers"
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              tab === "customers"
+                ? "bg-amber-400 text-neutral-950"
+                : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            بانک مشتریان ({customers.length})
           </a>
 
           <a
@@ -257,7 +297,100 @@ export default async function AdminPage({
           </section>
         )}
 
-        {/* TAB 2: Content & Shop Management */}
+        {/* TAB 2: Customers Database */}
+        {tab === "customers" && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">بانک اطلاعات مشتریان</h2>
+                <p className="text-xs text-neutral-400">
+                  اطلاعات، تعداد دفعات مراجعه، تاریخ تولد و یادداشت‌های اختصاصی هر مشتری
+                </p>
+              </div>
+              <span className="rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-amber-400">
+                مجموع: {customers.length} مشتری
+              </span>
+            </div>
+
+            {customers.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-900/30 p-12 text-center text-sm text-neutral-500">
+                هنوز مشتری در دیتابیس ثبت نشده است.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {customers.map((c) => (
+                  <article
+                    key={c.id}
+                    className="rounded-3xl border border-neutral-800/80 bg-neutral-900/70 p-5 backdrop-blur-sm transition hover:border-neutral-700 space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-amber-400" />
+                          <h3 className="font-bold text-white text-base">{c.name}</h3>
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
+                          <Phone className="h-3.5 w-3.5 text-neutral-500" />
+                          <a
+                            href={`tel:${c.phone}`}
+                            dir="ltr"
+                            className="font-mono hover:text-white transition"
+                          >
+                            {c.phone}
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 font-mono text-xs font-bold text-amber-300">
+                          {c.total_visits} مراجعه
+                        </span>
+                        {c.last_visit_at && (
+                          <span className="text-[10px] text-neutral-500">
+                            آخرین: {new Date(c.last_visit_at).toLocaleDateString("fa-IR")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {c.birthday && (
+                      <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+                        <Gift className="h-3.5 w-3.5 text-amber-400" />
+                        <span>تاریخ تولد: {c.birthday}</span>
+                      </div>
+                    )}
+
+                    {/* Barber Notes Form */}
+                    <form action={updateCustomerNote} className="space-y-2 border-t border-neutral-800/80 pt-3">
+                      <input type="hidden" name="phone" value={c.phone} />
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-400">
+                        <FileText className="h-3.5 w-3.5 text-neutral-500" />
+                        یادداشت آرایشگر (مدل موی دلخواه، حساسیت و...):
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          name="notes"
+                          defaultValue={c.notes ?? ""}
+                          placeholder="مثلاً: فید متوسط شماره ۱، ریش خط‌ریش تیز..."
+                          className="flex-1 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-white placeholder-neutral-600 outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-neutral-800 px-3 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-700 transition"
+                        >
+                          ثبت
+                        </button>
+                      </div>
+                    </form>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* TAB 3: Content & Shop Management */}
         {tab === "content" && (
           <div className="space-y-10">
             {/* 1. General Shop Information */}

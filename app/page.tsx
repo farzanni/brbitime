@@ -3,9 +3,12 @@ import BookingForm from "./BookingForm";
 import ErrorBanner from "./ErrorBanner";
 import ProductsSection from "./ProductsSection";
 import EventsSection from "./EventsSection";
+import GallerySection from "./GallerySection";
+import HeroSection from "./HeroSection";
+import GlassyHeader from "./GlassyHeader";
 import { iranToday } from "@/lib/booking";
 import { getShopConfig } from "@/lib/shop";
-import { Scissors, MapPin, Phone, Camera, Clock, ShieldCheck } from "lucide-react";
+import { Phone, Camera } from "lucide-react";
 
 /**
  * Statically rendered + revalidated every 600s so Vercel serves it
@@ -17,78 +20,74 @@ export default async function Home() {
   const shop = await getShopConfig();
 
   return (
-    <main dir="rtl" className="min-h-screen bg-neutral-950 text-white selection:bg-amber-400 selection:text-neutral-950">
-      {/* Background ambient glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-25">
-        <div className="absolute -top-40 right-1/4 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 left-1/4 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
+    <main
+      dir="rtl"
+      className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black"
+    >
+      {/* 1. Floating Glassy Navbar on Scroll */}
+      <GlassyHeader phone={shop.phone} shopName={shop.name} />
+
+      {/* 2. High-end Marble Background Light Effects */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/[0.08] via-white/[0.01] to-transparent blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Top Header */}
-        <header className="mb-10 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900/80 px-4 py-1.5 text-xs text-neutral-300 backdrop-blur-md">
-            <Scissors className="h-3.5 w-3.5 text-amber-400" />
-            <span>نوبت‌دهی آنلاین و خدمات تخصصی</span>
+      <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-12">
+        {/* 3. Classy Landing Hero Section */}
+        <HeroSection
+          name={shop.name}
+          tagline={shop.tagline}
+          address={shop.address}
+          phone={shop.phone}
+        />
+
+        {/* 4. Main Content Grid (Mobile First: Timeline -> Products -> Booking) */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+          {/* Timeline of Events (Mobile: 1st under hero / Desktop: Left column) */}
+          <div
+            id="timeline"
+            className="order-1 scroll-mt-20 rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl lg:order-3 lg:col-span-3"
+          >
+            <EventsSection events={shop.events} />
           </div>
 
-          <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl text-white">
-            {shop.name}
-          </h1>
-
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-400">
-            خدمات موردنظرت رو انتخاب کن، ساعت دلخواهت رو بردار و بدون معطلی اصلاح شو.
-          </p>
-
-          {/* Quick info bar */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-neutral-400">
-            {shop.address && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 text-amber-400" />
-                {shop.address}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 text-amber-400" />
-              همه‌روزه از ساعت ۱۵:۰۰ تا ۲۱:۰۰
-            </span>
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              تضمین کیفیت و بهداشت ابزار
-            </span>
-          </div>
-        </header>
-
-        {/* 3-Column Responsive Grid */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-          {/* Right Column in RTL: Products */}
-          <div className="order-2 rounded-3xl border border-neutral-800/80 bg-neutral-900/30 p-5 backdrop-blur-md lg:order-1 lg:col-span-3">
+          {/* Products Showcase (Mobile: 2nd under hero / Desktop: Right column) */}
+          <div className="order-2 rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl lg:order-1 lg:col-span-3">
             <ProductsSection products={shop.products} />
           </div>
 
-          {/* Center Column: Booking Form */}
-          <div className="order-1 lg:order-2 lg:col-span-6">
+          {/* Booking Core (Mobile: 3rd / Desktop: Center column) */}
+          <div
+            id="booking"
+            className="order-3 scroll-mt-20 lg:order-2 lg:col-span-6"
+          >
             <Suspense fallback={null}>
               <ErrorBanner />
             </Suspense>
 
             <BookingForm minDate={iranToday()} />
           </div>
-
-          {/* Left Column in RTL: Events & Discounts */}
-          <div className="order-3 rounded-3xl border border-neutral-800/80 bg-neutral-900/30 p-5 backdrop-blur-md lg:order-3 lg:col-span-3">
-            <EventsSection events={shop.events} />
-          </div>
         </div>
 
-        {/* Footer */}
-        <footer className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-900 pt-8 text-xs text-neutral-500">
-          <p>© {shop.name} — تمامی حقوق محفوظ است.</p>
+        {/* 5. Photo Gallery Section of Barbershop */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+          <GallerySection gallery={shop.gallery} />
+        </div>
+
+        {/* 6. Minimalist Luxury Footer */}
+        <footer className="border-t border-white/[0.08] pt-8 pb-12 flex flex-wrap items-center justify-between gap-4 text-[11px] text-neutral-500">
+          <p className="font-mono">
+            © {new Date().getFullYear()} {shop.name} — ALL RIGHTS RESERVED.
+          </p>
 
           <div className="flex items-center gap-6">
-            <a href={`tel:${shop.phone}`} className="flex items-center gap-1 hover:text-white transition">
-              <Phone className="h-3.5 w-3.5 text-amber-400" />
-              <span>{shop.phone}</span>
+            <a
+              href={`tel:${shop.phone}`}
+              className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition"
+            >
+              <Phone className="h-3.5 w-3.5 text-neutral-300" />
+              <span className="font-mono">{shop.phone}</span>
             </a>
 
             {shop.instagram && (
@@ -96,15 +95,18 @@ export default async function Home() {
                 href={`https://instagram.com/${shop.instagram}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-white transition"
+                className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition"
               >
-                <Camera className="h-3.5 w-3.5 text-pink-400" />
-                <span>@{shop.instagram}</span>
+                <Camera className="h-3.5 w-3.5 text-neutral-300" />
+                <span className="font-mono">@{shop.instagram}</span>
               </a>
             )}
 
-            <a href="/admin" className="text-neutral-600 hover:text-neutral-400 transition">
-              پنل آرایشگر
+            <a
+              href="/admin"
+              className="rounded-lg border border-white/10 px-2.5 py-1 text-neutral-400 hover:border-white/30 hover:text-white transition"
+            >
+              ورود آرایشگر
             </a>
           </div>
         </footer>

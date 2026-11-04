@@ -4,14 +4,14 @@ import "./globals.css";
 
 const rawAppUrl =
   process.env.NEXT_PUBLIC_APP_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://muucut.ir");
 const appUrl = /^https?:\/\//i.test(rawAppUrl) ? rawAppUrl : `https://${rawAppUrl}`;
 
 function getSafeBaseUrl(url: string): URL {
   try {
     return new URL(url);
   } catch {
-    return new URL("http://localhost:3000");
+    return new URL("https://muucut.ir");
   }
 }
 

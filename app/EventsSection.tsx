@@ -1,49 +1,77 @@
 import { type EventItem } from "@/lib/shop";
-import { CalendarDays, Flame, Bell, Star } from "lucide-react";
+import { Clock, Calendar, Sparkles, ChevronLeft } from "lucide-react";
 
 export default function EventsSection({ events }: { events: EventItem[] }) {
   return (
-    <aside className="space-y-4">
-      <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-amber-400" />
-          <h2 className="text-base font-bold text-white">رویدادها و تخفیف‌ها</h2>
+    <aside className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white">
+            <Clock className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold tracking-wide text-white uppercase">
+              گاه‌شمار و رویدادها
+            </h2>
+            <p className="text-[10px] text-neutral-400">برنامه‌ها و تخفیف‌های پیش‌رو</p>
+          </div>
         </div>
-        <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-400">
-          <Flame className="h-3 w-3" />
-          ویژه
+        <span className="rounded-full border border-white/20 bg-white/5 px-2.5 py-0.5 font-mono text-[10px] text-neutral-300">
+          TIMELINE
         </span>
       </div>
 
-      <p className="text-xs leading-5 text-neutral-400">
-        جدیدترین اطلاعیه‌ها، طرح‌های تخفیف فصلی و روزهای تعطیل سالن.
-      </p>
+      {/* Vertical Timeline */}
+      <div className="relative pr-3">
+        {/* Continuous Connecting Line */}
+        <div
+          aria-hidden="true"
+          className="absolute right-[19px] top-3 bottom-4 w-px bg-gradient-to-b from-white/40 via-white/20 to-white/5"
+        />
 
-      <div className="space-y-3">
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="group relative overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-900/60 p-4 transition hover:border-amber-500/40 hover:bg-neutral-900"
-          >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                <Star className="h-3 w-3" />
-                {event.tag}
-              </span>
-              <span className="text-[11px] text-neutral-500 font-mono">
-                {event.date}
-              </span>
+        <div className="space-y-6">
+          {events.map((event, index) => (
+            <div
+              key={event.id}
+              className="group relative flex items-start gap-4 transition"
+            >
+              {/* Bullet Node */}
+              <div className="relative z-10 flex shrink-0 items-center justify-center">
+                <div className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-white/90 bg-[#070707] ring-4 ring-white/10 transition-all duration-300 group-hover:scale-125 group-hover:border-white group-hover:ring-white/30 group-hover:shadow-[0_0_12px_rgba(255,255,255,0.6)]">
+                  <div className="h-1.5 w-1.5 rounded-full bg-white transition group-hover:scale-110" />
+                </div>
+              </div>
+
+              {/* Event Content Card with Sharp Cut Stone Look */}
+              <div className="flex-1 rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/60 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-sm transition-all duration-300 group-hover:-translate-x-1 group-hover:border-white/25 group-hover:from-white/[0.08]">
+                {/* Meta row: tag + date */}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  {event.tag && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-neutral-200">
+                      <Sparkles className="h-2.5 w-2.5 text-white" />
+                      {event.tag}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1 font-mono text-[11px] text-neutral-400">
+                    <Calendar className="h-3 w-3 text-neutral-500" />
+                    <span>{event.date}</span>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-xs font-bold text-white transition group-hover:text-white">
+                  {event.title}
+                </h3>
+
+                {/* Description */}
+                <p className="mt-1.5 text-[11px] leading-5 text-neutral-400">
+                  {event.description}
+                </p>
+              </div>
             </div>
-
-            <h3 className="font-semibold text-white group-hover:text-amber-300 transition text-sm">
-              {event.title}
-            </h3>
-
-            <p className="mt-1 text-xs leading-5 text-neutral-400">
-              {event.description}
-            </p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </aside>
   );

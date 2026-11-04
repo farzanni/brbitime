@@ -23,8 +23,17 @@ export interface EventItem {
   tag: string;
 }
 
+export interface GalleryItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  tag: string;
+}
+
 export interface ShopConfig {
   name: string;
+  tagline: string;
   phone: string;
   instagram: string;
   address: string;
@@ -32,6 +41,7 @@ export interface ShopConfig {
   services: ServiceItem[];
   products: ProductItem[];
   events: EventItem[];
+  gallery: GalleryItem[];
 }
 
 export const DEFAULT_SERVICES: ServiceItem[] = [
@@ -82,22 +92,55 @@ export const DEFAULT_EVENTS: EventItem[] = [
   },
   {
     id: "hair-care-session",
-    title: "مشاوره رایگان استایل و سلامت پوست",
+    title: "مشاوره استایل و آنالیز چهره",
     date: "دوشنبه‌ها ساعت ۱۷ الی ۱۹",
     description: "بررسی فرم صورت و انتخاب بهترین مدل مو مناسب شما",
     tag: "رویداد رایگان",
   },
 ];
 
+export const DEFAULT_GALLERY: GalleryItem[] = [
+  {
+    id: "g1",
+    title: "فضای اختصاصی سالن",
+    subtitle: "طراحی مدرن بر پایه سنگ‌های تیره و مرمر مشکی",
+    imageUrl: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80",
+    tag: "فضای سالن",
+  },
+  {
+    id: "g2",
+    title: "ابزار اختصاصی و اصلاح کلاسیک",
+    subtitle: "تیغ‌های سوئیسی استریل و ابزار تمام فلزی",
+    imageUrl: "https://images.unsplash.com/photo-1512690459411-b9245aed614b?auto=format&fit=crop&w=800&q=80",
+    tag: "ابزار کار",
+  },
+  {
+    id: "g3",
+    title: "استایل و فید مدرن",
+    subtitle: "طراحی خطوط متناسب با ساختار هندسی صورت",
+    imageUrl: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=800&q=80",
+    tag: "هنر پیرایش",
+  },
+  {
+    id: "g4",
+    title: "فرم‌دهی تخصصی ریش",
+    subtitle: "اصلاح دقیق زاویه‌ها با حوله گرم و روغن آرگان",
+    imageUrl: "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=800&q=80",
+    tag: "مراقبت ریش",
+  },
+];
+
 export const DEFAULT_SHOP: ShopConfig = {
-  name: "آرایشگاه امیر",
+  name: "مو کات (Muu Cut)",
+  tagline: "هنر پیرایش مدرن و استایل اختصاصی",
   phone: "09103785097",
-  instagram: "amir_barber",
+  instagram: "muucut.ir",
   address: "تهران، خیابان ولیعصر، نرسیده به میدان ونک",
   birthdayPromoText: "با ثبت تاریخ تولد، در هفته تولدتان از ما ۵۰٪ تخفیف و خدمات ویژه هدیه بگیرید.",
   services: DEFAULT_SERVICES,
   products: DEFAULT_PRODUCTS,
   events: DEFAULT_EVENTS,
+  gallery: DEFAULT_GALLERY,
 };
 
 export const SHOP = DEFAULT_SHOP;
@@ -116,6 +159,7 @@ export async function getShopConfig(): Promise<ShopConfig> {
         services: Array.isArray(data.services) && data.services.length > 0 ? data.services : DEFAULT_SERVICES,
         products: Array.isArray(data.products) && data.products.length > 0 ? data.products : DEFAULT_PRODUCTS,
         events: Array.isArray(data.events) && data.events.length > 0 ? data.events : DEFAULT_EVENTS,
+        gallery: Array.isArray(data.gallery) && data.gallery.length > 0 ? data.gallery : DEFAULT_GALLERY,
       };
     }
   } catch {
