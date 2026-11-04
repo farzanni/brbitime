@@ -131,8 +131,8 @@ export const DEFAULT_GALLERY: GalleryItem[] = [
 ];
 
 export const DEFAULT_SHOP: ShopConfig = {
-  name: "مو کات (Muu Cut)",
-  tagline: "هنر پیرایش مدرن و استایل اختصاصی",
+  name: "مو کات",
+  tagline: "مجموعه سالن تخصصی مو کات",
   phone: "09103785097",
   instagram: "muucut.ir",
   address: "تهران، خیابان ولیعصر، نرسیده به میدان ونک",

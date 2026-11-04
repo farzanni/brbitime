@@ -4,13 +4,11 @@ import BrandLogo from "./BrandLogo";
 import { MapPin, Clock, ShieldCheck, ArrowDown, Scissors, Sparkles, User } from "lucide-react";
 
 export default function HeroSection({
-  name,
-  tagline,
   address,
 }: {
-  name: string;
-  tagline: string;
-  address: string;
+  name?: string;
+  tagline?: string;
+  address?: string;
   phone?: string;
 }) {
   return (
@@ -19,7 +17,7 @@ export default function HeroSection({
       <div className="absolute inset-0 z-0">
         <Image
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1600&q=80"
-          alt="Muu Cut Salon Interior"
+          alt="سالن تخصصی مو کات"
           fill
           priority
           sizes="(max-width: 1200px) 100vw, 1200px"
@@ -34,24 +32,24 @@ export default function HeroSection({
       <div className="relative z-10 px-6 py-14 text-center sm:py-20 lg:px-12">
         {/* Brand Logo Emblem */}
         <div className="mx-auto mb-6 flex justify-center">
-          <div className="rounded-2xl border border-white/20 bg-black/60 p-3.5 shadow-[0_0_40px_rgba(255,255,255,0.12)] backdrop-blur-xl">
-            <BrandLogo size="lg" />
+          <div className="rounded-3xl border border-white/20 bg-black/70 p-2 shadow-[0_0_50px_rgba(255,255,255,0.16)] backdrop-blur-2xl transition hover:scale-105 duration-300">
+            <BrandLogo size="lg" className="rounded-2xl" />
           </div>
         </div>
 
         {/* Brand Tagline Badge */}
         <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-mono tracking-widest text-neutral-300 backdrop-blur-md">
           <Sparkles className="h-3 w-3 text-white" />
-          <span>HAUTE COIFFURE & BARBER ATELIER</span>
+          <span>MOO CUT BARBER ATELIER</span>
         </div>
 
         {/* Big Brand Title */}
-        <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-6xl text-white">
-          {name}
+        <h1 className="mt-5 text-3xl font-black tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight">
+          مجموعه سالن تخصصی مو کات
         </h1>
 
         <p className="mx-auto mt-4 max-w-xl text-xs sm:text-sm leading-6 text-neutral-300">
-          {tagline} — تجربه‌ای متمایز از پیرایش حرفه‌ای، آنالیز ساختار صورت و استایل اختصاصی در محیطی آرام و مدرن.
+          تجربه‌ای متمایز از پیرایش حرفه‌ای، استایل اختصاصی، آنالیز فرم چهره و مراقبت تخصصی مو و ریش در محیطی مدرن و لوکس.
         </p>
 
         {/* Hero Actions (Fast Reservation CTA as requested) */}

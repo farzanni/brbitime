@@ -28,7 +28,11 @@ export const metadata: Metadata = {
     description: "بدون تماس، بدون انتظار. روز و ساعتت را خودت انتخاب کن.",
     type: "website",
     locale: "fa_IR",
-    images: ["/og.jpg"],
+    images: ["/logo.webp"],
+  },
+  icons: {
+    icon: "/emblem.webp",
+    apple: "/emblem.webp",
   },
 };
 
