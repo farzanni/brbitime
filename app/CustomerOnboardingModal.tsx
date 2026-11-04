@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Sparkles,
   Scissors,
+  Lock,
 } from "lucide-react";
 import {
   getSavedCustomerProfile,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/customerCache";
 import { normalizeDigits } from "@/lib/booking";
 import { registerCustomer } from "./actions";
+import { parseBirthday } from "@/lib/birthday";
 import BirthdayPicker from "./BirthdayPicker";
 
 interface Props {
@@ -113,7 +115,8 @@ export default function CustomerOnboardingModal({
   const handleCompleteSubscription = () => {
     const cleanPhone = normalizeDigits(phoneInput);
     const cleanName = nameInput.trim();
-    const cleanBirthday = normalizeDigits(birthdayInput.trim());
+    // Birthday is immutable once set: preserve existing profile.birthday if present
+    const cleanBirthday = profile.birthday || normalizeDigits(birthdayInput.trim());
 
     startTransition(async () => {
       const formData = new FormData();
@@ -352,12 +355,31 @@ export default function CustomerOnboardingModal({
                   </div>
                 </div>
 
-                <div>
-                  <BirthdayPicker
-                    value={birthdayInput}
-                    onChange={(val) => setBirthdayInput(val)}
-                  />
-                </div>
+                {profile.birthday ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-right space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-neutral-400">تاریخ تولد ثبت‌شده:</span>
+                      <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                        <Lock className="h-3 w-3 text-neutral-400" />
+                        غیرقابل تغییر
+                      </span>
+                    </div>
+                    <p className="font-bold text-sm text-white flex items-center gap-2">
+                      <Gift className="h-4 w-4 text-purple-400" />
+                      {parseBirthday(profile.birthday)?.formatted || profile.birthday}
+                    </p>
+                    <p className="text-[10px] text-neutral-500 leading-relaxed">
+                      جهت حفظ اصالت تخفیف‌ها، تاریخ تولد پس از یک‌بار ثبت قفل می‌شود. (جهت اصلاح فقط با مدیریت هماهنگ کنید).
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <BirthdayPicker
+                      value={birthdayInput}
+                      onChange={(val) => setBirthdayInput(val)}
+                    />
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <button

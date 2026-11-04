@@ -18,11 +18,16 @@ import {
   Trash2,
   RefreshCw,
   Sparkles,
+  Edit3,
+  Check,
+  X,
+  Lock,
 } from "lucide-react";
 import { checkBirthdayStatus } from "@/lib/birthday";
 import {
   getCustomerPortalData,
   cancelCustomerAppointment,
+  updateCustomerName,
   type CustomerPortalData,
   type CustomerPortalAppointment,
 } from "../actions";
@@ -73,6 +78,43 @@ export default function CustomerPortalClient({
   const [cancellingAppt, setCancellingAppt] = useState<CustomerPortalAppointment | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Name editing state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+
+  function startEditingName() {
+    setNameInput(data?.customer?.name || "");
+    setIsEditingName(true);
+  }
+
+  function handleNameSave() {
+    const trimmed = nameInput.trim();
+    if (trimmed.length < 2) {
+      setActionMessage({ type: "error", text: "نام باید حداقل ۲ حرف باشد." });
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await updateCustomerName(phone, trimmed);
+      if (res.success) {
+        saveCustomerProfile({ name: trimmed });
+        if (data?.customer) {
+          setData({
+            ...data,
+            customer: {
+              ...data.customer,
+              name: trimmed,
+            },
+          });
+        }
+        setIsEditingName(false);
+        setActionMessage({ type: "success", text: "نام شما با موفقیت تغییر یافت." });
+      } else {
+        setActionMessage({ type: "error", text: res.error || "خطا در تغییر نام." });
+      }
+    });
+  }
 
   // Load appointments when phone is present
   useEffect(() => {
@@ -277,9 +319,55 @@ export default function CustomerPortalClient({
                     <Scissors className="h-7 w-7 text-neutral-200" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-white">
-                      {data?.customer?.name ? `${data.customer.name} عزیز` : "خوش آمدید"}
-                    </h2>
+                    {isEditingName ? (
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="customer-new-name" className="sr-only">
+                          نام جدید
+                        </label>
+                        <input
+                          id="customer-new-name"
+                          type="text"
+                          value={nameInput}
+                          onChange={(e) => setNameInput(e.target.value)}
+                          placeholder="نام و نام خانوادگی"
+                          className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-bold text-white outline-none focus:border-white focus:ring-1 focus:ring-white transition"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleNameSave}
+                          disabled={isPending}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black hover:bg-neutral-200 transition active:scale-95 disabled:opacity-50"
+                          title="ذخیره نام"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingName(false)}
+                          disabled={isPending}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-neutral-400 hover:text-white transition"
+                          title="انصراف"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-black text-white">
+                          {data?.customer?.name ? `${data.customer.name} عزیز` : "خوش آمدید"}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={startEditingName}
+                          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-neutral-400 hover:text-white hover:border-white/20 transition"
+                          title="ویرایش نام"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                          <span>تغییر نام</span>
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-1 text-xs text-neutral-400 font-mono">
                       <span>{phone}</span>
                       <span>•</span>
@@ -326,6 +414,10 @@ export default function CustomerPortalClient({
                       <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-neutral-300 font-medium">
                         <Gift className="h-3.5 w-3.5 text-purple-400" />
                         <span>تولد: {bStatus.formattedDate}</span>
+                        <span className="text-[10px] text-neutral-500 mr-1 flex items-center gap-0.5 font-normal" title="تاریخ تولد غیرقابل تغییر است">
+                          <Lock className="h-2.5 w-2.5" />
+                          قفل
+                        </span>
                       </div>
                     );
                   })()}

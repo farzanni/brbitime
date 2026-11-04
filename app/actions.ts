@@ -84,7 +84,7 @@ export async function bookAppointment(formData: FormData) {
       ON CONFLICT (phone) DO UPDATE
       SET
         name = EXCLUDED.name,
-        birthday = COALESCE(EXCLUDED.birthday, customers.birthday),
+        birthday = COALESCE(customers.birthday, EXCLUDED.birthday),
         total_visits = customers.total_visits + 1,
         last_visit_at = NOW(),
         updated_at = NOW()
@@ -327,7 +327,7 @@ export async function registerCustomer(formData: FormData) {
     ON CONFLICT (phone) DO UPDATE
     SET
       name = EXCLUDED.name,
-      birthday = COALESCE(EXCLUDED.birthday, customers.birthday),
+      birthday = COALESCE(customers.birthday, EXCLUDED.birthday),
       updated_at = NOW()
   `;
 
@@ -495,6 +495,32 @@ export async function cancelCustomerAppointment(publicId: string, rawPhone: stri
     phone: String(appt.phone),
   });
 
+  return { success: true };
+}
+
+/** Update customer name (birthday remains immutable) */
+export async function updateCustomerName(rawPhone: string, newName: string) {
+  const phone = cleanIranPhone(rawPhone);
+  const name = newName.trim();
+  if (!/^09\d{9}$/.test(phone) || name.length < 2 || name.length > 80) {
+    return { success: false, error: "نام وارد شده باید بین ۲ تا ۸۰ حرف باشد." };
+  }
+
+  const sql = getSql();
+  await sql`
+    UPDATE customers
+    SET name = ${name}, updated_at = NOW()
+    WHERE phone = ${phone}
+  `;
+
+  await sql`
+    UPDATE appointments
+    SET customer_name = ${name}
+    WHERE phone = ${phone}
+  `;
+
+  revalidatePath("/admin");
+  revalidatePath("/my");
   return { success: true };
 }
 
