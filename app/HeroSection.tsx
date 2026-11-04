@@ -1,5 +1,6 @@
+import Link from "next/link";
 import BrandLogo from "./BrandLogo";
-import { MapPin, Clock, ShieldCheck, ArrowDown, Scissors, Sparkles } from "lucide-react";
+import { MapPin, Clock, ShieldCheck, ArrowDown, Scissors, Sparkles, User } from "lucide-react";
 
 export default function HeroSection({
   name,
@@ -58,6 +59,14 @@ export default function HeroSection({
             <Scissors className="h-4 w-4" />
             <span>رزرو سریع وقت آنلاین</span>
           </a>
+
+          <Link
+            href="/my"
+            className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3.5 text-xs sm:text-sm font-semibold text-white hover:bg-white/15 transition backdrop-blur-md active:scale-95"
+          >
+            <User className="h-4 w-4" />
+            <span>پیگیری و نوبت‌های من</span>
+          </Link>
 
           <a
             href="#timeline"

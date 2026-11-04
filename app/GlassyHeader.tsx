@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import BrandLogo from "./BrandLogo";
-import { Phone, CalendarCheck } from "lucide-react";
+import { Phone, CalendarCheck, User } from "lucide-react";
 
 export default function GlassyHeader({
   phone,
@@ -47,7 +48,16 @@ export default function GlassyHeader({
         </a>
 
         {/* Left side: Fast Action CTAs */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/my"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 text-xs text-neutral-300 hover:border-white/30 hover:text-white transition"
+            title="نوبت‌های من"
+          >
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">نوبت‌های من</span>
+          </Link>
+
           <a
             href={`tel:${phone}`}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-neutral-300 hover:border-white/30 hover:text-white transition"

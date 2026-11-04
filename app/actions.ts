@@ -11,7 +11,7 @@ import {
   createAdminSession,
   isAdmin,
 } from "@/lib/admin";
-import { notifyBooking } from "@/lib/notify";
+import { notifyBooking, notifyCancellation } from "@/lib/notify";
 import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from "@/lib/shop";
 
 
@@ -354,5 +354,144 @@ export async function updateCustomerNote(formData: FormData) {
 
   revalidatePath("/admin");
   redirect("/admin?tab=customers&saved=1");
+}
+
+function cleanIranPhone(raw: string): string {
+  const digits = normalizeDigits(raw).replace(/\D/g, "");
+  if (digits.startsWith("0098")) return "0" + digits.slice(4);
+  if (digits.startsWith("98")) return "0" + digits.slice(2);
+  if (digits.length === 10 && digits.startsWith("9")) return "0" + digits;
+  return digits;
+}
+
+export interface CustomerPortalAppointment {
+  id: number;
+  public_id: string;
+  service: string;
+  appointment_date: string;
+  appointment_time: string;
+  customer_name: string;
+  phone: string;
+  status: "booked" | "cancelled";
+  customer_birthday: string | null;
+  created_at: string;
+}
+
+export interface CustomerPortalData {
+  customer: {
+    name: string;
+    phone: string;
+    birthday: string | null;
+    total_visits: number;
+  } | null;
+  appointments: CustomerPortalAppointment[];
+}
+
+/** Get customer appointments and profile details for the portal */
+export async function getCustomerPortalData(rawPhone: string): Promise<CustomerPortalData> {
+  const phone = cleanIranPhone(rawPhone);
+  if (!/^09\d{9}$/.test(phone)) {
+    return { customer: null, appointments: [] };
+  }
+
+  const sql = getSql();
+  const [customerRows, appointmentRows] = await Promise.all([
+    sql`
+      SELECT name, phone, birthday, total_visits
+      FROM customers
+      WHERE phone = ${phone}
+      LIMIT 1
+    `,
+    sql`
+      SELECT
+        id,
+        public_id,
+        service,
+        appointment_date::text,
+        appointment_time,
+        customer_name,
+        phone,
+        status,
+        customer_birthday,
+        created_at::text
+      FROM appointments
+      WHERE phone = ${phone}
+      ORDER BY appointment_date DESC, appointment_time DESC
+    `,
+  ]);
+
+  const customer = customerRows[0]
+    ? {
+        name: String(customerRows[0].name || ""),
+        phone: String(customerRows[0].phone || phone),
+        birthday: customerRows[0].birthday ? String(customerRows[0].birthday) : null,
+        total_visits: Number(customerRows[0].total_visits || 0),
+      }
+    : null;
+
+  const appointments: CustomerPortalAppointment[] = (appointmentRows || []).map((row) => ({
+    id: Number(row.id),
+    public_id: String(row.public_id),
+    service: String(row.service),
+    appointment_date: String(row.appointment_date),
+    appointment_time: String(row.appointment_time),
+    customer_name: String(row.customer_name),
+    phone: String(row.phone),
+    status: row.status === "cancelled" ? "cancelled" : "booked",
+    customer_birthday: row.customer_birthday ? String(row.customer_birthday) : null,
+    created_at: String(row.created_at),
+  }));
+
+  return { customer, appointments };
+}
+
+/** Zero-friction appointment cancellation by customer */
+export async function cancelCustomerAppointment(publicId: string, rawPhone: string) {
+  const phone = cleanIranPhone(rawPhone);
+  if (!PUBLIC_ID_PATTERN.test(publicId) || !/^09\d{9}$/.test(phone)) {
+    return { success: false, error: "شناسه نوبت یا شماره تماس نامعتبر است." };
+  }
+
+  const sql = getSql();
+
+  // Find the appointment first to verify phone match and gather details for alert
+  const rows = await sql`
+    SELECT id, service, appointment_date::text, appointment_time, customer_name, phone
+    FROM appointments
+    WHERE public_id = ${publicId}
+      AND phone = ${phone}
+      AND status = 'booked'
+    LIMIT 1
+  `;
+
+  if (!rows || rows.length === 0) {
+    return {
+      success: false,
+      error: "نوبت یافت نشد یا قبلاً لغو شده است.",
+    };
+  }
+
+  const appt = rows[0];
+
+  // Cancel in Neon DB
+  await sql`
+    UPDATE appointments
+    SET status = 'cancelled'
+    WHERE id = ${appt.id}
+  `;
+
+  revalidatePath("/admin");
+  revalidatePath("/my");
+
+  // Alert the barber via Telegram in background
+  await notifyCancellation({
+    service: String(appt.service),
+    date: String(appt.appointment_date),
+    time: String(appt.appointment_time),
+    name: String(appt.customer_name),
+    phone: String(appt.phone),
+  });
+
+  return { success: true };
 }
 

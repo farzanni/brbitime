@@ -118,3 +118,48 @@ export async function notifyBooking(input: {
 
   await Promise.allSettled([smsPromise, ...telegramPromises]);
 }
+
+export interface CancelNotificationInput {
+  service: string;
+  date: string;
+  time: string;
+  name: string;
+  phone: string;
+}
+
+export async function notifyCancellation(input: CancelNotificationInput) {
+  const targets = getTargets();
+  if (targets.length === 0) return;
+
+  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const manageLink = appUrl ? `\nمدیریت: ${appUrl}/admin` : "";
+
+  const text = [
+    "⚠️ <b>لغو نوبت توسط مشتری!</b>",
+    "",
+    `👤 ${escapeHtml(input.name)}`,
+    `📞 <code>${escapeHtml(input.phone)}</code>`,
+    `💈 ${escapeHtml(SERVICE_NAMES[input.service] ?? input.service)}`,
+    `📅 ${escapeHtml(input.date)} — ⏰ ${escapeHtml(input.time)}`,
+    manageLink,
+  ].join("\n");
+
+  await Promise.allSettled(
+    targets.map(async ({ token, chatId }) => {
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: "HTML",
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+      } catch (error) {
+        console.error("telegram cancel notification error:", error);
+      }
+    })
+  );
+}

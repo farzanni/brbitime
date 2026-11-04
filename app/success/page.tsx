@@ -102,12 +102,20 @@ export default async function SuccessPage({
           </>
         )}
 
-        <Link
-          href="/"
-          className="mt-8 block rounded-2xl bg-white p-4 font-semibold text-black"
-        >
-          بازگشت
-        </Link>
+        <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <Link
+            href="/my"
+            className="flex-1 rounded-2xl border border-white/20 bg-white/10 p-4 font-semibold text-white backdrop-blur-md hover:bg-white/15 transition text-center"
+          >
+            مشاهده همه نوبت‌های من
+          </Link>
+          <Link
+            href="/"
+            className="flex-1 rounded-2xl bg-white p-4 font-semibold text-black hover:bg-neutral-200 transition text-center"
+          >
+            بازگشت به خانه
+          </Link>
+        </div>
       </div>
     </main>
   );
