@@ -3,6 +3,7 @@ import { SHOP } from "@/lib/shop";
 import "./globals.css";
 
 const rawAppUrl =
+  process.env.APP_URL ??
   process.env.NEXT_PUBLIC_APP_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://muucut.ir");
 const appUrl = /^https?:\/\//i.test(rawAppUrl) ? rawAppUrl : `https://${rawAppUrl}`;

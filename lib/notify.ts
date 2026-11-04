@@ -64,7 +64,7 @@ export async function notifyBooking(input: {
     return;
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
   const manageLink = appUrl ? `\nمدیریت: ${appUrl}/admin` : "";
 
   const text = [
