@@ -13,7 +13,7 @@ export default function HeroSection({
 }) {
   return (
     <section className="relative w-full overflow-hidden pt-24 pb-14 sm:pt-32 sm:pb-20">
-      {/* Full-width Faded Background Image — seamless, no box boundary */}
+      {/* Full-width Background Image — clearly visible with soft edge fade */}
       <div className="absolute inset-0 z-0">
         <Image
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2000&q=85"
@@ -22,11 +22,10 @@ export default function HeroSection({
           priority
           sizes="100vw"
           quality={85}
-          className="object-cover object-center opacity-40 filter grayscale contrast-125 scale-105 pointer-events-none select-none"
+          className="object-cover object-center opacity-80 contrast-110 brightness-95 pointer-events-none select-none"
         />
-        {/* Gradients to fade out seamlessly into the deep black page background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/70 via-[#050505]/50 to-[#050505]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#050505_85%)]" />
+        {/* Soft gradient dissolve into page background without burying the image */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-black/35 to-[#050505]" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
@@ -36,17 +35,17 @@ export default function HeroSection({
         </div>
 
         {/* Brand Tagline */}
-        <div className="inline-flex items-center gap-2 text-xs font-mono tracking-[0.25em] text-neutral-400">
-          <Sparkles className="h-3 w-3 text-neutral-300" />
+        <div className="inline-flex items-center gap-2 text-xs font-mono tracking-[0.25em] text-neutral-300 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+          <Sparkles className="h-3 w-3 text-neutral-200" />
           <span>MOO CUT BARBER ATELIER</span>
         </div>
 
         {/* Big Brand Title */}
-        <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight">
+        <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
           مجموعه سالن تخصصی مو کات
         </h1>
 
-        <p className="mx-auto mt-4 max-w-xl text-xs sm:text-sm leading-6 text-neutral-300">
+        <p className="mx-auto mt-4 max-w-xl text-xs sm:text-sm leading-6 text-neutral-200 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
           تجربه‌ای متمایز از پیرایش حرفه‌ای، استایل اختصاصی، آنالیز فرم چهره و مراقبت تخصصی مو و ریش در محیطی مدرن و لوکس.
         </p>
 
