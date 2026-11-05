@@ -4,7 +4,7 @@ export interface ServiceItem {
   id: string;
   name: string;
   price: string;
-  duration: string;
+  duration?: string;
 }
 
 export interface ProductItem {
@@ -37,6 +37,7 @@ export interface ShopConfig {
   phone: string;
   instagram: string;
   address: string;
+  mapUrl?: string;
   birthdayPromoText: string;
   services: ServiceItem[];
   products: ProductItem[];
@@ -45,10 +46,14 @@ export interface ShopConfig {
 }
 
 export const DEFAULT_SERVICES: ServiceItem[] = [
-  { id: "haircut", name: "اصلاح و استایل مو", price: "۴۰۰٬۰۰۰ تومان", duration: "۳۰ دقیقه" },
-  { id: "beard", name: "اصلاح و فرم‌دهی ریش", price: "۱۰۰٬۰۰۰ تومان", duration: "۱۰ دقیقه" },
-  { id: "combo", name: "پکیج کامل (مو + ریش)", price: "۴۵۰٬۰۰۰ تومان", duration: "۴۰ دقیقه" },
-  { id: "vip", name: "پکیج VIP (مو + ریش + ماسک صورت)", price: "۶۵۰٬۰۰۰ تومان", duration: "۶۰ دقیقه" },
+  { id: "haircut", name: "اصلاح کامل و استایل مو", price: "۵۵۰٬۰۰۰ تومان", duration: "۴۰ دقیقه" },
+  { id: "beard", name: "اصلاح ریش", price: "۳۵۰٬۰۰۰ تومان", duration: "۲۰ دقیقه" },
+  { id: "vip-package", name: "پکیج وی ای پی اصلاح و پاکسازی", price: "۱٬۴۰۰٬۰۰۰ تا ۱٬۸۰۰٬۰۰۰ تومان", duration: "۵۵ دقیقه" },
+  { id: "vip", name: "اصلاح تخصصی وی ای پی", price: "۷۵۰٬۰۰۰ تومان", duration: "۵۵ دقیقه" },
+  { id: "lineup", name: "خط گیری سر و ریش", price: "۱۲۰٬۰۰۰ تومان" },
+  { id: "styling", name: "سشوار و استایل", price: "۱۰۰٬۰۰۰ تومان" },
+  { id: "cleansing", name: "پاکسازی", price: "۱٬۲۰۰٬۰۰۰ تومان" },
+  { id: "wax", name: "وکس", price: "۱۵۰٬۰۰۰ تومان" },
 ];
 
 export const DEFAULT_PRODUCTS: ProductItem[] = [
@@ -135,7 +140,8 @@ export const DEFAULT_SHOP: ShopConfig = {
   tagline: "مجموعه سالن تخصصی مو کات",
   phone: "09103785097",
   instagram: "muucut.ir",
-  address: "تهران، خیابان ولیعصر، نرسیده به میدان ونک",
+  address: "خیابان احمدپور، قبل از مینمندی نیا",
+  mapUrl: "https://maps.app.goo.gl/U3Qv1DMGiSSPbGyg8",
   birthdayPromoText: "با ثبت تاریخ تولد، در هفته تولدتان از ما ۵۰٪ تخفیف و خدمات ویژه هدیه بگیرید.",
   services: DEFAULT_SERVICES,
   products: DEFAULT_PRODUCTS,

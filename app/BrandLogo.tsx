@@ -7,7 +7,7 @@ export default function BrandLogo({
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }) {
-  const dim = size === "sm" ? 36 : size === "md" ? 54 : size === "lg" ? 112 : 148;
+  const dim = size === "sm" ? 38 : size === "md" ? 56 : size === "lg" ? 116 : 152;
   const src = size === "sm" ? "/emblem.webp" : "/logo.webp";
 
   return (
@@ -20,7 +20,7 @@ export default function BrandLogo({
         alt="لوگو مو کات"
         fill
         sizes={`${dim}px`}
-        className="object-contain object-center mix-blend-screen drop-shadow-[0_0_20px_rgba(255,255,255,0.25)]"
+        className="object-contain object-center drop-shadow-[0_2px_16px_rgba(255,255,255,0.18)]"
         priority
       />
     </div>

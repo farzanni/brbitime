@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import BrandLogo from "./BrandLogo";
 import { Phone, CalendarCheck, User } from "lucide-react";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 export default function GlassyHeader({
   phone,
@@ -58,6 +59,7 @@ export default function GlassyHeader({
 
           <a
             href={`tel:${phone}`}
+            onClick={() => trackClientEvent("contact_click", { channel: "phone", location: "header" })}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-neutral-300 hover:border-white/30 hover:text-white transition"
             title="تماس مستقیم"
           >

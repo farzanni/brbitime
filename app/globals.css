@@ -25,81 +25,254 @@ h1, h2, h3, h4, h5, h6 {
   text-wrap: balance;
 }
 
-/* DayPicker Luxury Dark Theme Overrides */
+/* ==========================================================================
+   DayPicker Luxury Dark Theme (Persian Jalali Calendar)
+   Unified with site's sleek black & glass aesthetic
+   ========================================================================== */
+
 .rdp-root {
   --rdp-accent-color: #ffffff;
-  --rdp-accent-background-color: rgba(255, 255, 255, 0.12);
-  --rdp-day-height: 42px;
-  --rdp-day-width: 42px;
+  --rdp-accent-background-color: rgba(255, 255, 255, 0.08);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
   --rdp-day_button-height: 38px;
   --rdp-day_button-width: 38px;
   --rdp-day_button-border-radius: 12px;
   --rdp-today-color: #ffffff;
-  --rdp-nav_button-height: 2rem;
-  --rdp-nav_button-width: 2rem;
+  --rdp-nav-height: 2.5rem;
+  --rdp-nav_button-height: 2.125rem;
+  --rdp-nav_button-width: 2.125rem;
   color: #ededed;
   font-family: inherit;
+  width: 100%;
+  max-width: 320px;
   margin: 0 auto;
+  user-select: none;
 }
 
+.rdp-months {
+  width: 100%;
+}
+
+.rdp-month {
+  width: 100%;
+  position: relative;
+}
+
+/* Header & Month Caption */
 .rdp-month_caption {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #ffffff;
-  margin-bottom: 0.75rem;
-  text-align: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 2.5rem !important;
+  margin-bottom: 0.75rem !important;
 }
 
+.rdp-caption_label {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.01em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  padding: 0.3rem 0.9rem !important;
+  border-radius: 9999px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Navigation Buttons (Prev / Next) */
+.rdp-button_previous,
+.rdp-button_next,
+.rdp-nav button {
+  position: absolute !important;
+  top: 3px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #d4d4d4 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  padding: 0 !important;
+}
+
+.rdp-button_previous {
+  inset-inline-start: 2px !important;
+}
+
+.rdp-button_next {
+  inset-inline-end: 2px !important;
+}
+
+.rdp-button_previous:hover:not([disabled]):not([aria-disabled="true"]),
+.rdp-button_next:hover:not([disabled]):not([aria-disabled="true"]),
+.rdp-nav button:hover:not([disabled]):not([aria-disabled="true"]) {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  transform: scale(1.05) !important;
+}
+
+.rdp-button_previous:active:not([disabled]):not([aria-disabled="true"]),
+.rdp-button_next:active:not([disabled]):not([aria-disabled="true"]),
+.rdp-nav button:active:not([disabled]):not([aria-disabled="true"]) {
+  transform: scale(0.95) !important;
+}
+
+.rdp-button_previous:disabled,
+.rdp-button_previous[aria-disabled="true"],
+.rdp-button_next:disabled,
+.rdp-button_next[aria-disabled="true"] {
+  opacity: 0.18 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  background-color: transparent !important;
+  color: #555555 !important;
+}
+
+.rdp-button_previous .rdp-chevron,
+.rdp-button_next .rdp-chevron,
+.rdp-chevron {
+  width: 15px !important;
+  height: 15px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2.25 !important;
+  transform: none !important;
+  display: block !important;
+}
+
+/* Weekday column headers */
 .rdp-weekdays {
-  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding-bottom: 0.4rem !important;
+  margin-bottom: 0.4rem !important;
 }
 
 .rdp-weekday {
-  font-size: 0.75rem;
-  color: #888888;
-  font-weight: 500;
-  padding-bottom: 0.5rem;
-  text-align: center;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #888888 !important;
+  text-align: center !important;
+  padding: 0.25rem 0 !important;
 }
 
+/* Iranian Friday (جمعه) accent */
+.rdp-weekday:last-child {
+  color: rgba(248, 113, 113, 0.8) !important;
+}
+
+/* Grid & Weeks Table */
+.rdp-month_grid {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 3px 4px !important;
+  margin: 0 auto !important;
+}
+
+.rdp-day {
+  padding: 0 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  height: auto !important;
+}
+
+/* Day Buttons */
 .rdp-day_button {
-  color: #ededed;
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: all 0.15s ease;
+  width: 100% !important;
+  max-width: 38px !important;
+  height: 38px !important;
+  border-radius: 12px !important;
+  color: #ededed !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  position: relative !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.rdp-day_button:hover:not([disabled]) {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+/* Hover on available days */
+.rdp-day_button:hover:not([disabled]):not([aria-disabled="true"]) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
 }
 
+.rdp-day_button:active:not([disabled]):not([aria-disabled="true"]) {
+  transform: scale(0.95) !important;
+}
+
+/* Selected Day: Crisp white fill with dark text and luxury glow */
 .rdp-selected .rdp-day_button {
   background-color: #ffffff !important;
+  border-color: #ffffff !important;
   color: #000000 !important;
-  font-weight: 800;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
+  font-weight: 800 !important;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+  transform: translateY(-1px) scale(1.02) !important;
 }
 
+/* Today (when not selected): subtle border and luminous dot */
 .rdp-today:not(.rdp-selected) .rdp-day_button {
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
-.rdp-disabled .rdp-day_button {
-  opacity: 0.2;
-  cursor: not-allowed;
+.rdp-today:not(.rdp-selected) .rdp-day_button::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
 }
 
-.rdp-nav_button {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  transition: all 0.15s ease;
+/* Disabled days (e.g. past dates) */
+.rdp-disabled .rdp-day_button,
+.rdp-day_button:disabled,
+.rdp-day_button[aria-disabled="true"] {
+  opacity: 0.18 !important;
+  color: #777777 !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  transform: none !important;
 }
 
-.rdp-nav_button:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+/* Outside/hidden days */
+.rdp-outside .rdp-day_button,
+.rdp-hidden {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Accessible focus ring */
+.rdp-day_button:focus-visible,
+.rdp-button_previous:focus-visible,
+.rdp-button_next:focus-visible {
+  outline: 2px solid #ffffff !important;
+  outline-offset: 2px !important;
 }

@@ -36,6 +36,7 @@ import {
   saveCustomerProfile,
 } from "@/lib/customerCache";
 import { SERVICES } from "@/lib/booking";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 function formatPersianDate(dateStr: string): string {
   try {
@@ -52,6 +53,7 @@ function formatPersianDate(dateStr: string): string {
 }
 
 function getServiceName(serviceId: string): string {
+  if (serviceId === "combo") return "پکیج کامل (مو + ریش)";
   return SERVICES.find((s) => s.id === serviceId)?.name ?? serviceId;
 }
 
@@ -59,10 +61,12 @@ export default function CustomerPortalClient({
   shopName,
   shopPhone,
   shopAddress,
+  shopMapUrl,
 }: {
   shopName: string;
   shopPhone: string;
   shopAddress?: string;
+  shopMapUrl?: string;
 }) {
   const [phone, setPhone] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -126,6 +130,7 @@ export default function CustomerPortalClient({
         if (!isCurrent) return;
         setData(res);
         setIsLoading(false);
+        trackClientEvent("portal_view", { hasPhone: true, appointmentsCount: res.appointments.length });
       })
       .catch(() => {
         if (!isCurrent) return;
@@ -543,6 +548,16 @@ export default function CustomerPortalClient({
                           {shopAddress && (
                             <p className="text-[11px] text-neutral-500">
                               📍 آدرس: {shopAddress}
+                              {shopMapUrl && (
+                                <a
+                                  href={shopMapUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mr-2 text-neutral-400 hover:text-white underline underline-offset-2 transition"
+                                >
+                                  (مسیریابی روی نقشه)
+                                </a>
+                              )}
                             </p>
                           )}
                         </div>

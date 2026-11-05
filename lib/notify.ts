@@ -1,9 +1,10 @@
 import { SERVICES } from "@/lib/booking";
 import { sendBookingSms } from "@/lib/sms";
 
-const SERVICE_NAMES: Record<string, string> = Object.fromEntries(
-  SERVICES.map((service) => [service.id, service.name]),
-);
+const SERVICE_NAMES: Record<string, string> = {
+  combo: "پکیج کامل (مو + ریش)",
+  ...Object.fromEntries(SERVICES.map((service) => [service.id, service.name])),
+};
 
 type Target = { token: string; chatId: string };
 
@@ -45,8 +46,8 @@ function escapeHtml(value: string) {
 }
 
 /**
- * Sends a booking notification to every configured Telegram target
- * (shop owner, operator, ...).
+ * Sends a booking notification to SMS (customer & barber) and
+ * to configured Telegram targets (shop owner, operator, ...).
  * Never throws — a failed notification must not fail a confirmed booking.
  */
 export async function notifyBooking(input: {
@@ -57,10 +58,24 @@ export async function notifyBooking(input: {
   name: string;
   phone: string;
 }): Promise<void> {
+  const serviceTitle = SERVICE_NAMES[input.service] ?? input.service;
+
+  // Send SMS to customer & barber (runs safely in background without throwing)
+  const smsPromise = sendBookingSms({
+    customerName: input.name,
+    customerPhone: input.phone,
+    serviceName: serviceTitle,
+    date: input.date,
+    time: input.time,
+  }).catch((error) => {
+    console.error("SMS booking dispatch error:", error);
+  });
+
   const targets = getTargets();
 
   if (targets.length === 0) {
     console.warn("telegram notification skipped: no targets configured");
+    await smsPromise;
     return;
   }
 
@@ -72,21 +87,10 @@ export async function notifyBooking(input: {
     "",
     `👤 ${escapeHtml(input.name)}`,
     `📞 <code>${escapeHtml(input.phone)}</code>`,
-    `💈 ${escapeHtml(SERVICE_NAMES[input.service] ?? input.service)}`,
+    `💈 ${escapeHtml(serviceTitle)}`,
     `📅 ${escapeHtml(input.date)} — ⏰ ${escapeHtml(input.time)}`,
     manageLink,
   ].join("\n");
-
-  const serviceTitle = SERVICE_NAMES[input.service] ?? input.service;
-
-  // Send SMS to customer & barber (runs in background without throwing)
-  const smsPromise = sendBookingSms({
-    customerName: input.name,
-    customerPhone: input.phone,
-    serviceName: serviceTitle,
-    date: input.date,
-    time: input.time,
-  });
 
   const telegramPromises = targets.map(async ({ token, chatId }) => {
     try {

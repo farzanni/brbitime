@@ -17,6 +17,7 @@ Postgres, and the Telegram Bot API. Fully RTL / Persian-first.
 - Live availability: booked slots are disabled and double-bookings are rejected at the DB level (`UNIQUE` constraint)
 - Instant Telegram alert to the owner on every new booking (non-blocking — booking succeeds even if the alert fails)
 - Owner panel at `/admin` (password login, HMAC-signed session cookie): upcoming appointments, cancel, logout
+- Business & Funnel Analytics at `/admin?tab=analytics`: estimated revenue, conversion funnel, service breakdown, peak days & hours, marketing attribution (Instagram/SMS/Direct), and live activity stream
 - Confirmation page with the customer's own booking details
 
 ## Environment variables
@@ -50,6 +51,39 @@ CREATE TABLE IF NOT EXISTS appointments (
 CREATE UNIQUE INDEX IF NOT EXISTS appointments_slot_unique
   ON appointments (appointment_date, appointment_time)
   WHERE status = 'booked';
+
+-- barber unavailable times / leaves:
+CREATE TABLE IF NOT EXISTS unavailable_times (
+  id SERIAL PRIMARY KEY,
+  date TEXT NOT NULL,
+  time TEXT NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unavailable_times_date_time_unique
+  ON unavailable_times (date, time);
+CREATE INDEX IF NOT EXISTS unavailable_times_date_idx
+  ON unavailable_times (date);
+
+-- first-party business & funnel analytics:
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id BIGSERIAL PRIMARY KEY,
+  event_name TEXT NOT NULL,
+  event_data JSONB DEFAULT '{}',
+  path TEXT NOT NULL DEFAULT '/',
+  referrer TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  device_type TEXT,
+  session_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_event_name ON analytics_events(event_name);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_utm_source ON analytics_events(utm_source);
 ```
 
 ## Develop

@@ -17,17 +17,47 @@ function getProvider(): SmsProvider {
   return "mock";
 }
 
+/**
+ * Returns barber notification phone numbers.
+ * Defaults to 09376802989 (allowed account number) for test/notifications. Supports comma-separated list.
+ */
+export function getBarberPhones(): string[] {
+  const raw = process.env.BARBER_PHONE?.trim() || "09376802989";
+  return raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 async function sendKavenegarSms(apiKey: string, receptor: string, message: string, sender?: string) {
-  const params = new URLSearchParams({
-    receptor,
-    message,
-    ...(sender && { sender }),
-  });
-  return fetch(`https://api.kavenegar.com/v1/${apiKey}/sms/send.json`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
+  try {
+    const params = new URLSearchParams({
+      receptor,
+      message,
+      ...(sender && { sender }),
+    });
+    const res = await fetch(`https://api.kavenegar.com/v1/${apiKey}/sms/send.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    const json = (await res.json().catch(() => null)) as {
+      return?: { status: number; message: string };
+      entries?: Array<{ messageid: number; status: number; statustext: string; receptor: string }>;
+    } | null;
+
+    if (!res.ok || (json && json.return && json.return.status !== 200)) {
+      console.error(
+        `[Kavenegar SMS Error] Status ${json?.return?.status ?? res.status} for ${receptor}:`,
+        json?.return?.message ?? "Unknown error"
+      );
+    } else {
+      console.log(`[Kavenegar SMS Success] Sent to ${receptor} (ID: ${json?.entries?.[0]?.messageid})`);
+    }
+    return json;
+  } catch (error) {
+    console.error(`[Kavenegar SMS Network Error] Failed to send to ${receptor}:`, error);
+  }
 }
 
 /**
@@ -37,7 +67,8 @@ async function sendKavenegarSms(apiKey: string, receptor: string, message: strin
 export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> {
   const provider = getProvider();
   const shopName = SHOP.name || "سالن پیرایش";
-  const sender = process.env.SMS_SENDER;
+  const sender = process.env.SMS_SENDER || "2000660110";
+  const barberPhones = getBarberPhones();
 
   const customerMessage = `سلام ${payload.customerName} عزیز، نوبت شما در ${shopName} برای خدمت ${payload.serviceName} در تاریخ ${payload.date} ساعت ${payload.time} با موفقیت ثبت شد.`;
   const barberMessage = `نوبت جدید: ${payload.customerName} | ${payload.serviceName} | ${payload.date} ساعت ${payload.time} | تماس: ${payload.customerPhone}`;
@@ -47,6 +78,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
       const apiKey = process.env.KAVENEGAR_API_KEY ?? "";
       const template = process.env.KAVENEGAR_PATTERN_BOOKING;
 
+      // 1. Send SMS to customer
       if (template) {
         // Fast Verify Lookup API (passes blacklist/DND)
         const params = new URLSearchParams({
@@ -61,9 +93,9 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
         await sendKavenegarSms(apiKey, payload.customerPhone, customerMessage, sender);
       }
 
-      // Notify Barber
-      if (SHOP.phone && SHOP.phone !== payload.customerPhone) {
-        await sendKavenegarSms(apiKey, SHOP.phone, barberMessage, sender);
+      // 2. Notify Barber (send to configured barber phone e.g. 09308537418)
+      for (const barberPhone of barberPhones) {
+        await sendKavenegarSms(apiKey, barberPhone, barberMessage, sender);
       }
     } else if (provider === "farazsms") {
       const apiKey = process.env.FARAZSMS_API_KEY || process.env.IPPANEL_API_KEY || "";
@@ -103,10 +135,26 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
           }),
         });
       }
+
+      // Notify Barber
+      for (const barberPhone of barberPhones) {
+        await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `AccessKey ${apiKey}`,
+          },
+          body: JSON.stringify({
+            recipient: [barberPhone],
+            sender: originPhone,
+            message: barberMessage,
+          }),
+        });
+      }
     } else {
       console.log(`[SMS MOCK] Customer (${payload.customerPhone}): ${customerMessage}`);
-      if (SHOP.phone) {
-        console.log(`[SMS MOCK] Barber (${SHOP.phone}): ${barberMessage}`);
+      for (const barberPhone of barberPhones) {
+        console.log(`[SMS MOCK] Barber (${barberPhone}): ${barberMessage}`);
       }
     }
   } catch (err) {

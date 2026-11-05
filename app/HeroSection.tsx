@@ -7,10 +7,12 @@ export default function HeroSection({
   name,
   tagline,
   address,
+  mapUrl,
 }: {
   name?: string;
   tagline?: string;
   address?: string;
+  mapUrl?: string;
   phone?: string;
 }) {
   return (
@@ -67,10 +69,25 @@ export default function HeroSection({
         {/* Concise Hours & Location */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-neutral-400">
           {address && (
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-neutral-300" />
-              <span>{address}</span>
-            </span>
+            mapUrl ? (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-1.5 transition hover:text-white"
+                title="مسیریابی روی نقشه گوگل"
+              >
+                <MapPin className="h-3.5 w-3.5 text-neutral-300 transition group-hover:text-amber-400" />
+                <span className="underline decoration-white/30 underline-offset-4 group-hover:decoration-white">
+                  {address}
+                </span>
+              </a>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-neutral-300" />
+                <span>{address}</span>
+              </span>
+            )
           )}
           {address && <span className="hidden sm:inline text-white/20">•</span>}
           <span className="flex items-center gap-1.5 font-mono">

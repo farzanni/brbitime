@@ -26,18 +26,45 @@ export async function GET(request: Request) {
 
 
   const sql = getSql();
-  const rows = await sql`
-    SELECT appointment_time
-    FROM appointments
-    WHERE appointment_date = ${date}
-      AND status = 'booked'
-  `;
+  const [appointmentRows, unavailableRows] = await Promise.all([
+    sql`
+      SELECT appointment_time, service
+      FROM appointments
+      WHERE appointment_date = ${date}
+        AND status = 'booked'
+    `,
+    sql`
+      SELECT time, note
+      FROM unavailable_times
+      WHERE date = ${date}
+    `.catch(() => []),
+  ]);
+
+  const unavailable = unavailableRows.map((row) => ({
+    time: String(row.time),
+    note: row.note ? String(row.note) : null,
+  }));
+
+  const isAllDayUnavailable = unavailable.some(
+    (u) => u.time === "all-day" || u.time === "all" || u.time === "کل روز"
+  );
+  const allDayNote =
+    unavailable.find(
+      (u) => u.time === "all-day" || u.time === "all" || u.time === "کل روز"
+    )?.note ?? null;
 
   return Response.json(
     {
-      bookedTimes: rows.map(
+      bookedTimes: appointmentRows.map(
         (row) => row.appointment_time as string
       ),
+      appointments: appointmentRows.map((row) => ({
+        time: row.appointment_time as string,
+        service: row.service as string,
+      })),
+      unavailable,
+      isAllDayUnavailable,
+      allDayNote,
     },
     {
       headers: {

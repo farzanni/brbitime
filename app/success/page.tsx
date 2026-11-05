@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getSql } from "@/lib/db";
 import { SERVICES } from "@/lib/booking";
-import { cancelMyBooking } from "../actions";
+import { getShopConfig } from "@/lib/shop";
+import BrandLogo from "../BrandLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function SuccessPage({
   searchParams: Promise<{ id?: string; cancelled?: string }>;
 }) {
   const { id, cancelled } = await searchParams;
+  const shop = await getShopConfig();
 
   let appointment: Appointment | null = null;
 
@@ -45,7 +47,7 @@ export default async function SuccessPage({
 
   const serviceName = appointment
     ? SERVICES.find((item) => item.id === appointment.service)?.name ??
-      appointment.service
+      (appointment.service === "combo" ? "پکیج کامل (مو + ریش)" : appointment.service)
     : null;
 
   return (
@@ -54,7 +56,10 @@ export default async function SuccessPage({
       className="flex min-h-screen items-center justify-center bg-neutral-950 px-5 text-white"
     >
       <div className="w-full max-w-md text-center">
-        <div className="mb-5 text-5xl">{cancelled ? "✕" : "✓"}</div>
+        <div className="mx-auto mb-5 flex justify-center">
+          <BrandLogo size="md" />
+        </div>
+        <div className="mb-5 text-4xl">{cancelled ? "✕" : "✓"}</div>
 
         {cancelled ? (
           <>
@@ -75,29 +80,33 @@ export default async function SuccessPage({
                 📅 {appointment.appointment_date} — ⏰{" "}
                 {appointment.appointment_time}
               </p>
+              {shop.address && (
+                <div className="mt-3 pt-3 border-t border-neutral-800 text-xs text-neutral-400 space-y-1 text-center">
+                  <p>📍 {shop.address}</p>
+                  {shop.mapUrl && (
+                    <a
+                      href={shop.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-white/80 hover:text-white underline underline-offset-4"
+                    >
+                      مسیریابی روی نقشه گوگل ←
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
 
             <p className="mt-5 leading-7 text-neutral-400">
-              این صفحه را اسکرین‌شات بگیر. اگر تغییرش می‌خواهی می‌توانی همین‌جا
-              لغو کنی یا با آرایشگاه تماس بگیری.
+              می‌توانی نوبت‌هایت را در پنل خودت مشاهده و در صورت نیاز لغو کنی.
             </p>
-
-            <form action={cancelMyBooking} className="mt-6">
-              <input type="hidden" name="publicId" value={id} />
-              <button
-                type="submit"
-                className="w-full rounded-2xl border border-neutral-800 bg-neutral-900 p-4 font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
-              >
-                لغو این نوبت
-              </button>
-            </form>
           </>
         ) : (
           <>
             <h1 className="text-2xl font-bold">نوبت شما ثبت شد</h1>
 
             <p className="mt-3 leading-7 text-neutral-400">
-              در صورت نیاز آرایشگاه با شما تماس می‌گیرد.
+              می‌توانید نوبت‌های خود را در پنل کاربری مشاهده کرده و در صورت نیاز لغو کنید.
             </p>
           </>
         )}
@@ -107,7 +116,7 @@ export default async function SuccessPage({
             href="/my"
             className="flex-1 rounded-2xl border border-white/20 bg-white/10 p-4 font-semibold text-white backdrop-blur-md hover:bg-white/15 transition text-center"
           >
-            مشاهده همه نوبت‌های من
+            مشاهده نوبت‌ها در پنل
           </Link>
           <Link
             href="/"

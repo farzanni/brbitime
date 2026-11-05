@@ -4,7 +4,16 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSql } from "@/lib/db";
-import { SERVICES, TIME_SLOTS, iranToday, normalizeDigits } from "@/lib/booking";
+import {
+  SERVICES,
+  TIME_SLOTS,
+  iranToday,
+  normalizeDigits,
+  isHaircutService,
+  OTHER_SLOT_MINUTES,
+  getSlotsForService,
+  isSlotPast,
+} from "@/lib/booking";
 import {
   adminPasswordMatches,
   clearAdminSession,
@@ -14,6 +23,8 @@ import {
 import { notifyBooking, notifyCancellation } from "@/lib/notify";
 import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from "@/lib/shop";
 import { parseBirthday } from "@/lib/birthday";
+import { recordAnalyticsEvent } from "@/lib/analytics";
+import { addUnavailableRecords, deleteUnavailableRecord } from "@/lib/unavailable";
 
 
 export async function bookAppointment(formData: FormData) {
@@ -24,6 +35,8 @@ export async function bookAppointment(formData: FormData) {
   const phone = normalizeDigits(String(formData.get("phone") ?? ""));
   const rawBirthday = String(formData.get("birthday") ?? "").trim();
   const birthday = parseBirthday(rawBirthday)?.normalized ?? null;
+
+  const isHaircut = isHaircutService(service);
 
   const valid =
     SERVICES.some((item) => item.id === service) &&
@@ -38,10 +51,59 @@ export async function bookAppointment(formData: FormData) {
     redirect("/?error=invalid");
   }
 
+  if (isHaircut && !time.endsWith(":۰۰")) {
+    redirect("/?error=invalid");
+  }
+  if (!isHaircut && !OTHER_SLOT_MINUTES.some((m) => time.endsWith(m))) {
+    redirect("/?error=invalid");
+  }
+
+  // Reject slots that have already passed
+  if (isSlotPast(date, time, isHaircut)) {
+    redirect("/?error=slot-passed");
+  }
+
+  const sql = getSql();
+
+  // Validate that the requested slot is currently available
+  const [existingAppts, unavailableRows] = await Promise.all([
+    sql`
+      SELECT appointment_time, service
+      FROM appointments
+      WHERE appointment_date = ${date}
+        AND status = 'booked'
+    `,
+    sql`
+      SELECT time, note
+      FROM unavailable_times
+      WHERE date = ${date}
+    `.catch(() => []),
+  ]);
+
+  const availableSlots = getSlotsForService(
+    service,
+    existingAppts.map((r) => ({
+      time: String(r.appointment_time),
+      service: String(r.service),
+    })),
+    unavailableRows.map((r) => ({
+      time: String(r.time),
+      note: r.note ? String(r.note) : null,
+    })),
+    date
+  );
+
+  const slotStatus = availableSlots.find((s) => s.time === time);
+  if (!slotStatus || slotStatus.isBooked || slotStatus.isPassed) {
+    if (slotStatus?.isPassed) {
+      redirect("/?error=slot-passed");
+    }
+    redirect("/?error=slot-taken");
+  }
+
   const publicId = randomUUID();
 
   try {
-    const sql = getSql();
     await sql`
       INSERT INTO appointments (
         public_id,
@@ -101,6 +163,17 @@ export async function bookAppointment(formData: FormData) {
 
   revalidatePath("/admin");
 
+  await recordAnalyticsEvent({
+    eventName: "booking_success",
+    eventData: {
+      publicId,
+      service,
+      date,
+      time,
+      name,
+    },
+  });
+
   await notifyBooking({
     publicId,
     service,
@@ -147,6 +220,11 @@ export async function cancelAppointment(formData: FormData) {
       AND status = 'booked'
   `;
 
+  await recordAnalyticsEvent({
+    eventName: "booking_cancelled",
+    eventData: { id, cancelledBy: "admin" },
+  });
+
   revalidatePath("/admin");
 }
 
@@ -168,6 +246,11 @@ export async function cancelMyBooking(formData: FormData) {
       AND status = 'booked'
   `;
 
+  await recordAnalyticsEvent({
+    eventName: "booking_cancelled",
+    eventData: { publicId, cancelledBy: "customer" },
+  });
+
   revalidatePath("/admin");
   redirect(`/success?id=${publicId}&cancelled=1`);
 }
@@ -182,6 +265,7 @@ export async function updateShopSettings(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const instagram = String(formData.get("instagram") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
+  const mapUrl = String(formData.get("mapUrl") ?? "").trim();
   const birthdayPromoText = String(formData.get("birthdayPromoText") ?? "").trim();
 
   await saveShopConfig({
@@ -189,6 +273,7 @@ export async function updateShopSettings(formData: FormData) {
     ...(phone && { phone }),
     instagram,
     address,
+    mapUrl,
     ...(birthdayPromoText && { birthdayPromoText }),
   });
 
@@ -357,6 +442,61 @@ export async function updateCustomerNote(formData: FormData) {
 
   revalidatePath("/admin");
   redirect("/admin?tab=customers&saved=1");
+}
+
+/** Admin: Add unavailable times (blocked hours or all-day) with optional customer note */
+export async function addUnavailableTimes(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const date = String(formData.get("date") ?? "").trim();
+  const allDay = formData.get("allDay") === "true" || formData.get("allDay") === "1" || formData.get("allDay") === "on";
+  const rawTimes = formData.getAll("times").map(String);
+  const singleTime = String(formData.get("time") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    redirect("/admin?tab=schedule&error=invalid-date");
+  }
+
+  const timesToBlock: string[] = [];
+  if (allDay) {
+    timesToBlock.push("all-day");
+  } else {
+    for (const t of rawTimes) {
+      if (t.trim()) timesToBlock.push(t.trim());
+    }
+    if (singleTime && !timesToBlock.includes(singleTime)) {
+      timesToBlock.push(singleTime);
+    }
+  }
+
+  if (timesToBlock.length === 0) {
+    redirect("/admin?tab=schedule&error=no-time");
+  }
+
+  await addUnavailableRecords(date, timesToBlock, note);
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  redirect("/admin?tab=schedule&saved=1");
+}
+
+/** Admin: Delete an unavailable time record */
+export async function deleteUnavailableTime(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const id = Number(formData.get("id"));
+  if (Number.isInteger(id) && id > 0) {
+    await deleteUnavailableRecord(id);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  redirect("/admin?tab=schedule&saved=1");
 }
 
 function cleanIranPhone(raw: string): string {

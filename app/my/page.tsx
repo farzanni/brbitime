@@ -26,6 +26,7 @@ export default async function MyBookingsPage() {
         shopName={shop.name}
         shopPhone={shop.phone}
         shopAddress={shop.address}
+        shopMapUrl={shop.mapUrl}
       />
     </Suspense>
   );

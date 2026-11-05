@@ -18,6 +18,14 @@ export default function ErrorBanner() {
     );
   }
 
+  if (error === "slot-passed") {
+    return (
+      <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/40 p-4 text-sm">
+        زمان انتخابی شما گذشته است. لطفاً ساعت دیگری انتخاب کنید.
+      </div>
+    );
+  }
+
   if (error === "invalid") {
     return (
       <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/40 p-4 text-sm">

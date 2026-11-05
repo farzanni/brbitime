@@ -3,6 +3,7 @@ import { SERVICES, iranToday } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
 import { getShopConfig } from "@/lib/shop";
 import { checkBirthdayStatus } from "@/lib/birthday";
+import BrandLogo from "../BrandLogo";
 import {
   cancelAppointment,
   loginAdmin,
@@ -13,6 +14,7 @@ import {
   saveEvent,
   deleteEvent,
   updateCustomerNote,
+  deleteUnavailableTime,
 } from "../actions";
 import {
   Calendar,
@@ -30,7 +32,15 @@ import {
   Scissors,
   CheckCircle,
   FileText,
+  BarChart3,
+  CalendarOff,
+  Ban,
+  AlertCircle,
 } from "lucide-react";
+import AnalyticsView from "./AnalyticsView";
+import AdminUnavailableForm from "./AdminUnavailableForm";
+import { getBusinessAnalytics, type TimeRange } from "@/lib/analytics";
+import { getUnavailableTimes } from "@/lib/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +68,10 @@ type Customer = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; tab?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; saved?: string; range?: string }>;
 }) {
   const params = await searchParams;
-  const { error, tab = "appointments", saved } = params;
+  const { error, tab = "appointments", saved, range = "30d" } = params;
 
   if (!(await isAdmin())) {
     return (
@@ -74,8 +84,8 @@ export default async function AdminPage({
           className="w-full max-w-sm space-y-5 rounded-3xl border border-neutral-800 bg-neutral-900/90 p-8 shadow-2xl backdrop-blur-md"
         >
           <div className="text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
-              <Scissors className="h-6 w-6" />
+            <div className="mx-auto mb-3 flex justify-center">
+              <BrandLogo size="md" />
             </div>
             <h1 className="text-xl font-bold">ورود آرایشگر</h1>
             <p className="mt-1 text-xs text-neutral-400">برای مدیریت نوبت‌ها و وبسایت وارد شوید</p>
@@ -137,6 +147,10 @@ export default async function AdminPage({
   `) as Customer[];
 
   const shop = await getShopConfig();
+  const unavailableTimes = await getUnavailableTimes(iranToday());
+
+  const validRange = (["today", "7d", "30d", "all"].includes(range) ? range : "30d") as TimeRange;
+  const analyticsData = tab === "analytics" ? await getBusinessAnalytics(validRange) : null;
 
   return (
     <main dir="rtl" className="min-h-screen bg-neutral-950 text-white selection:bg-amber-400 selection:text-neutral-950">
@@ -144,8 +158,8 @@ export default async function AdminPage({
         {/* Admin Header */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-800 pb-6">
           <div>
-            <div className="flex items-center gap-2">
-              <Scissors className="h-5 w-5 text-amber-400" />
+            <div className="flex items-center gap-2.5">
+              <BrandLogo size="sm" />
               <h1 className="text-2xl font-black">{shop.name}</h1>
               <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400">
                 پنل آرایشگر
@@ -210,12 +224,50 @@ export default async function AdminPage({
             <Settings className="h-4 w-4" />
             مدیریت محتوا و محصولات
           </a>
+
+          <a
+            href="/admin?tab=schedule"
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              tab === "schedule"
+                ? "bg-amber-400 text-neutral-950"
+                : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+            }`}
+          >
+            <CalendarOff className="h-4 w-4" />
+            ساعت‌های عدم حضور ({unavailableTimes.length})
+          </a>
+
+          <a
+            href={`/admin?tab=analytics&range=${validRange}`}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              tab === "analytics"
+                ? "bg-amber-400 text-neutral-950"
+                : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            تحلیل و آمار کسب‌وکار
+          </a>
         </div>
 
         {saved === "1" && (
           <div className="mb-6 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-xs text-emerald-300">
             <CheckCircle className="h-4 w-4" />
             تغییرات با موفقیت ذخیره و در سایت اعمال شد.
+          </div>
+        )}
+
+        {error === "invalid-date" && (
+          <div className="mb-6 flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400">
+            <AlertCircle className="h-4 w-4" />
+            تاریخ انتخابی نامعتبر است.
+          </div>
+        )}
+
+        {error === "no-time" && (
+          <div className="mb-6 flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400">
+            <AlertCircle className="h-4 w-4" />
+            لطفاً حداقل یک ساعت یا گزینه کل روز را انتخاب کنید.
           </div>
         )}
 
@@ -233,7 +285,7 @@ export default async function AdminPage({
                 {appointments.map((appointment) => {
                   const service =
                     SERVICES.find((item) => item.id === appointment.service)?.name ??
-                    appointment.service;
+                    (appointment.service === "combo" ? "پکیج کامل (مو + ریش)" : appointment.service);
 
                   return (
                     <article
@@ -477,6 +529,17 @@ export default async function AdminPage({
                       className="w-full rounded-2xl border border-neutral-800 bg-neutral-950 p-3 text-sm text-white outline-none focus:border-amber-400"
                     />
                   </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-neutral-400">لینک گوگل مپس / نقشه سالن</label>
+                    <input
+                      name="mapUrl"
+                      defaultValue={shop.mapUrl}
+                      dir="ltr"
+                      placeholder="https://maps.app.goo.gl/..."
+                      className="w-full rounded-2xl border border-neutral-800 bg-neutral-950 p-3 text-left font-mono text-sm text-white outline-none focus:border-amber-400"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -657,6 +720,126 @@ export default async function AdminPage({
               </form>
             </section>
           </div>
+        )}
+
+        {/* TAB 4: Unavailable Times & Schedule */}
+        {tab === "schedule" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-lg font-bold">تنظیم زمان‌های عدم حضور و مرخصی آرایشگر</h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                در این بخش می‌توانید روزها و ساعت‌هایی را که در سالن حضور ندارید مشخص کنید تا مشتریان در سایت نتوانند آن ساعت‌ها را رزرو کنند، و در صورت تمایل پیامی برای نمایش به آنها درج فرمایید.
+              </p>
+            </div>
+
+            {/* Add Unavailable Time Form */}
+            <AdminUnavailableForm minDate={iranToday()} />
+
+            {/* List of active unavailable times */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <CalendarOff className="h-4 w-4 text-amber-400" />
+                  <h3 className="text-base font-bold text-white">
+                    لیست ساعت‌ها و روزهای مسدودشده ({unavailableTimes.length})
+                  </h3>
+                </div>
+                <span className="font-mono text-xs text-neutral-500">
+                  از تاریخ {iranToday()} به بعد
+                </span>
+              </div>
+
+              {unavailableTimes.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-900/30 p-12 text-center text-sm text-neutral-500">
+                  در حال حاضر هیچ زمان عدم حضوری ثبت نشده است و تمام ساعات کاری سالن فعال هستند.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {unavailableTimes.map((item) => {
+                    const isAllDay = item.time === "all-day" || item.time === "all" || item.time === "کل روز";
+                    let persianDateDisplay = item.date;
+                    try {
+                      const d = new Date(item.date + "T00:00:00");
+                      persianDateDisplay = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      }).format(d);
+                    } catch {
+                      persianDateDisplay = item.date;
+                    }
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="rounded-3xl border border-neutral-800/80 bg-neutral-900/70 p-5 backdrop-blur-sm transition hover:border-neutral-700 flex flex-col justify-between gap-4"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-sm text-white">
+                              {persianDateDisplay}
+                            </span>
+                            <span className="font-mono text-[11px] text-neutral-500">
+                              {item.date}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isAllDay ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-bold text-red-400">
+                                <Ban className="h-3.5 w-3.5" />
+                                کل روز (عدم حضور کامل)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-mono text-xs font-bold text-amber-300">
+                                <Clock className="h-3.5 w-3.5 text-amber-400" />
+                                ساعت {item.time}
+                              </span>
+                            )}
+                          </div>
+
+                          {item.note ? (
+                            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300">
+                              <span className="font-bold text-amber-400 block mb-1">
+                                یادداشت برای مشتریان:
+                              </span>
+                              <p className="leading-relaxed">{item.note}</p>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-neutral-500 italic">
+                              بدون یادداشت اختصاصی برای مشتریان
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="border-t border-neutral-800/80 pt-3 flex items-center justify-between">
+                          <span className="text-[10px] text-neutral-500">
+                            مسدود در رزرو آنلاین
+                          </span>
+                          <form action={deleteUnavailableTime}>
+                            <input type="hidden" name="id" value={item.id} />
+                            <button
+                              type="submit"
+                              className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>حذف و فعال‌سازی مجدد</span>
+                            </button>
+                          </form>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* TAB 5: Analytics */}
+        {tab === "analytics" && analyticsData && (
+          <AnalyticsView data={analyticsData} currentRange={validRange} />
         )}
       </div>
     </main>

@@ -8,7 +8,7 @@ import HeroSection from "./HeroSection";
 import GlassyHeader from "./GlassyHeader";
 import { iranToday } from "@/lib/booking";
 import { getShopConfig } from "@/lib/shop";
-import { Phone, Camera } from "lucide-react";
+import { Phone, Camera, MapPin } from "lucide-react";
 
 /**
  * Statically rendered + revalidated every 600s so Vercel serves it
@@ -32,6 +32,7 @@ export default async function Home() {
         name={shop.name}
         tagline={shop.tagline}
         address={shop.address}
+        mapUrl={shop.mapUrl}
         phone={shop.phone}
       />
 
@@ -85,6 +86,18 @@ export default async function Home() {
               >
                 <Camera className="h-3.5 w-3.5" />
                 <span className="font-mono">@{shop.instagram}</span>
+              </a>
+            )}
+
+            {shop.mapUrl && (
+              <a
+                href={shop.mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                <span>مسیریابی نقشه</span>
               </a>
             )}
 

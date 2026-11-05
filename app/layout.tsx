@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { SHOP } from "@/lib/shop";
+import AnalyticsTracker from "./AnalyticsTracker";
 import "./globals.css";
 
 const rawAppUrl =
@@ -28,11 +29,24 @@ export const metadata: Metadata = {
     description: "بدون تماس، بدون انتظار. روز و ساعتت را خودت انتخاب کن.",
     type: "website",
     locale: "fa_IR",
-    images: ["/logo.webp"],
+    images: [
+      {
+        url: "/logo.webp",
+        width: 1024,
+        height: 1024,
+        alt: `${SHOP.name} — رزرو آنلاین نوبت`,
+      },
+    ],
   },
   icons: {
-    icon: "/emblem.webp",
-    apple: "/emblem.webp",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/emblem.webp", type: "image/webp", sizes: "256x256" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -43,7 +57,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fa" dir="rtl" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <AnalyticsTracker />
+      </body>
     </html>
   );
 }
