@@ -1,20 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #070707;
+  --foreground: #ededed;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -25,4 +18,88 @@ body {
   font-family:
     "Vazirmatn", "Segoe UI", Tahoma, "Iranian Sans", system-ui, -apple-system,
     sans-serif;
+  text-wrap: pretty;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+}
+
+/* DayPicker Luxury Dark Theme Overrides */
+.rdp-root {
+  --rdp-accent-color: #ffffff;
+  --rdp-accent-background-color: rgba(255, 255, 255, 0.12);
+  --rdp-day-height: 42px;
+  --rdp-day-width: 42px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-day_button-border-radius: 12px;
+  --rdp-today-color: #ffffff;
+  --rdp-nav_button-height: 2rem;
+  --rdp-nav_button-width: 2rem;
+  color: #ededed;
+  font-family: inherit;
+  margin: 0 auto;
+}
+
+.rdp-month_caption {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.rdp-weekdays {
+  margin-bottom: 0.25rem;
+}
+
+.rdp-weekday {
+  font-size: 0.75rem;
+  color: #888888;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  text-align: center;
+}
+
+.rdp-day_button {
+  color: #ededed;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.rdp-day_button:hover:not([disabled]) {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.rdp-selected .rdp-day_button {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 800;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
+}
+
+.rdp-today:not(.rdp-selected) .rdp-day_button {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.rdp-disabled .rdp-day_button {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.rdp-nav_button {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: all 0.15s ease;
+}
+
+.rdp-nav_button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }

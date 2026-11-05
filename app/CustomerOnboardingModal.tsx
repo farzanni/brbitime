@@ -6,10 +6,8 @@ import {
   User,
   Gift,
   CheckCircle2,
-  X,
   ArrowLeft,
   ArrowRight,
-  Sparkles,
   Scissors,
   Lock,
 } from "lucide-react";
@@ -29,72 +27,35 @@ interface Props {
   onCloseExternal?: () => void;
 }
 
-export default function CustomerOnboardingModal({
+function ModalContent({
+  profile,
+  onClose,
   onProfileLoaded,
-  isOpenExternal,
-  onCloseExternal,
-}: Props) {
-  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
+}: {
+  profile: CustomerProfile;
+  onClose: () => void;
+  onProfileLoaded?: (profile: CustomerProfile) => void;
+}) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [isInternalOpen, setIsInternalOpen] = useState(false);
-  const [showGreetingToast, setShowGreetingToast] = useState(false);
-  const [phoneInput, setPhoneInput] = useState("");
-  const [nameInput, setNameInput] = useState("");
-  const [birthdayInput, setBirthdayInput] = useState("");
+  const [phoneInput, setPhoneInput] = useState(profile.phone || "");
+  const [nameInput, setNameInput] = useState(profile.name || "");
+  const [birthdayInput, setBirthdayInput] = useState(profile.birthday || "");
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const isModalOpen = isOpenExternal !== undefined ? isOpenExternal : isInternalOpen;
-
-
-  // On client mount: check if subscribed or needs onboarding
   useEffect(() => {
-    const current = getSavedCustomerProfile();
-    if (current.isSubscribed && current.name && current.phone) {
-      const showTimer = setTimeout(() => setShowGreetingToast(true), 0);
-      const hideTimer = setTimeout(() => setShowGreetingToast(false), 7000);
-      return () => {
-        clearTimeout(showTimer);
-        clearTimeout(hideTimer);
-      };
-    } else {
-      const openTimer = setTimeout(() => setIsInternalOpen(true), 0);
-      return () => clearTimeout(openTimer);
-    }
-  }, []);
-
-  // Update inputs whenever modal opens
-  const openModalForEditing = () => {
-    setPhoneInput(profile.phone || "");
-    setNameInput(profile.name || "");
-    setBirthdayInput(profile.birthday || "");
-    setStep(1);
-    setIsInternalOpen(true);
-  };
-
-  const handleClose = () => {
-    setIsInternalOpen(false);
-    if (onCloseExternal) onCloseExternal();
-  };
-
-  // Keyboard accessibility: Close on Escape
-  useEffect(() => {
-    if (!isModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsInternalOpen(false);
-        if (onCloseExternal) onCloseExternal();
-      }
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isModalOpen, onCloseExternal]);
+  }, [onClose]);
 
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = normalizeDigits(phoneInput);
     if (!/^09\d{9}$/.test(cleanPhone)) {
-      setErrorMsg("لطفاً شماره موبایل معتبر ۱۱ رقمی (مثل ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید.");
+      setErrorMsg("لطفاً شماره موبایل ۱۱ رقمی معتبر (مثل ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید.");
       return;
     }
     setErrorMsg("");
@@ -105,7 +66,7 @@ export default function CustomerOnboardingModal({
   const handleNextStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     if (nameInput.trim().length < 2) {
-      setErrorMsg("لطفاً نام و نام خانوادگی خود را کامل وارد کنید.");
+      setErrorMsg("لطفاً نام و نام خانوادگی را وارد کنید.");
       return;
     }
     setErrorMsg("");
@@ -115,7 +76,6 @@ export default function CustomerOnboardingModal({
   const handleCompleteSubscription = () => {
     const cleanPhone = normalizeDigits(phoneInput);
     const cleanName = nameInput.trim();
-    // Birthday is immutable once set: preserve existing profile.birthday if present
     const cleanBirthday = profile.birthday || normalizeDigits(birthdayInput.trim());
 
     startTransition(async () => {
@@ -134,276 +94,220 @@ export default function CustomerOnboardingModal({
       };
 
       saveCustomerProfile(updated);
-      setProfile(updated);
       if (onProfileLoaded) onProfileLoaded(updated);
 
-      handleClose();
-
-      setShowGreetingToast(true);
-      setTimeout(() => setShowGreetingToast(false), 6000);
+      onClose();
     });
   };
 
   return (
-    <>
-      {/* 1. Small Greeting Popup (Only if subscribed) */}
-      {showGreetingToast && profile.name && (
-        <aside
-          aria-live="polite"
-          className="fixed top-5 left-1/2 z-50 flex w-[92%] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border border-white/20 bg-[#0a0a0a]/95 p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white font-bold">
-              👋
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-mono tracking-wider text-neutral-400">خوش آمدید</p>
-              <h2 className="text-xs font-bold text-white">
-                سلام {profile.name} عزیز
-              </h2>
-            </div>
-          </div>
-
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+    >
+      <div
+        dir="rtl"
+        className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] p-6 shadow-2xl"
+      >
+        {/* Header & Steps */}
+        <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setShowGreetingToast(false);
-                openModalForEditing();
-              }}
-              className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-neutral-200 hover:border-white/40 hover:bg-white/10 transition"
-            >
-              ویرایش
-            </button>
-            <button
-              onClick={() => setShowGreetingToast(false)}
-              className="rounded-lg p-1 text-neutral-500 hover:text-white transition"
-              aria-label="بستن"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <Scissors className="h-4 w-4 text-white" />
+            <span className="text-xs font-bold text-white">
+              مشخصات نوبت
+            </span>
           </div>
-        </aside>
-      )}
 
-      {/* 2. Onboarding Modal (Phone -> Name -> Birthday Discount) */}
-      {isModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleClose();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-in fade-in duration-200"
-        >
-          <div
-            dir="rtl"
-            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/[0.12] bg-[#090909] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] sm:p-7"
-          >
-            {/* Top progress indicator */}
-            <div className="mb-6 flex items-center justify-between border-b border-white/[0.08] pb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white">
-                  <Scissors className="h-3.5 w-3.5" />
-                </div>
-                <span className="text-[11px] font-mono tracking-wider text-neutral-300 uppercase">
-                  MUU CUT • CLUB
-                </span>
-              </div>
-
-              {/* Steps: 1, 2, 3 */}
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    step >= 1 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
-                  }`}
-                >
-                  ۱
-                </span>
-                <span className="text-neutral-700">──</span>
-                <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    step >= 2 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
-                  }`}
-                >
-                  ۲
-                </span>
-                <span className="text-neutral-700">──</span>
-                <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    step === 3 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
-                  }`}
-                >
-                  ۳
-                </span>
-              </div>
-            </div>
-
-            {errorMsg && (
-              <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* STEP 1: Phone Number */}
-            {step === 1 && (
-              <form onSubmit={handleNextStep1} className="space-y-5">
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-white" />
-                    <h3 className="text-sm font-bold text-white">
-                      شماره موبایل
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-neutral-400 leading-5">
-                    جهت شناسایی در مراجعات بعدی و دریافت پیامک یادآوری زمان نوبت
-                  </p>
-                </div>
-
-                <div>
-                  <input
-                    required
-                    autoFocus
-                    type="tel"
-                    dir="ltr"
-                    inputMode="numeric"
-                    placeholder="09123456789"
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.12] bg-[#0c0c0c] p-3.5 text-left font-mono text-sm text-white placeholder-neutral-600 outline-none transition focus:border-white focus:ring-1 focus:ring-white"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-white p-3.5 font-bold text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] transition hover:bg-neutral-200 active:scale-[0.99]"
-                >
-                  <span className="text-xs">مرحله بعد</span>
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </button>
-              </form>
-            )}
-
-            {/* STEP 2: Name */}
-            {step === 2 && (
-              <form onSubmit={handleNextStep2} className="space-y-5">
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <User className="h-4 w-4 text-white" />
-                    <h3 className="text-sm font-bold text-white">
-                      نام و نام خانوادگی
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-neutral-400 leading-5">
-                    جهت ثبت در دفتر رزرو سالن و نوبت‌دهی اختصاصی
-                  </p>
-                </div>
-
-                <div>
-                  <input
-                    required
-                    autoFocus
-                    type="text"
-                    placeholder="مثال: علی رضایی"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.12] bg-[#0c0c0c] p-3.5 text-sm text-white placeholder-neutral-600 outline-none transition focus:border-white focus:ring-1 focus:ring-white"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="flex items-center justify-center rounded-xl border border-white/10 bg-[#0c0c0c] px-4 py-3 text-xs text-neutral-400 hover:text-white transition"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white p-3.5 font-bold text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] transition hover:bg-neutral-200 active:scale-[0.99]"
-                  >
-                    <span className="text-xs">مرحله بعد</span>
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* STEP 3: Birthday + Discount Announcement */}
-            {step === 3 && (
-              <div className="space-y-5">
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <Gift className="h-4 w-4 text-white" />
-                    <h3 className="text-sm font-bold text-white">
-                      تاریخ تولد
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-neutral-400 leading-5">
-                    ثبت تاریخ تولد اختیاری است اما هدیه سالن را به همراه دارد.
-                  </p>
-                </div>
-
-                {/* Birthday Promotion Highlight Card */}
-                <div className="flex items-start gap-3 rounded-2xl border border-white/15 bg-white/[0.04] p-4 text-xs leading-6 text-neutral-300">
-                  <Sparkles className="h-4 w-4 shrink-0 text-white mt-0.5" />
-                  <div>
-                    <strong className="block text-white font-bold">
-                      🎁 هدیه سالگرد تولد:
-                    </strong>
-                    با ثبت تاریخ تولد، در هفته تولدتان از ۵۰٪ تخفیف خدمات سالن و سرویس VIP هدیه بهره‌مند می‌شوید.
-                  </div>
-                </div>
-
-                {profile.birthday ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-right space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-neutral-400">تاریخ تولد ثبت‌شده:</span>
-                      <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
-                        <Lock className="h-3 w-3 text-neutral-400" />
-                        غیرقابل تغییر
-                      </span>
-                    </div>
-                    <p className="font-bold text-sm text-white flex items-center gap-2">
-                      <Gift className="h-4 w-4 text-purple-400" />
-                      {parseBirthday(profile.birthday)?.formatted || profile.birthday}
-                    </p>
-                    <p className="text-[10px] text-neutral-500 leading-relaxed">
-                      جهت حفظ اصالت تخفیف‌ها، تاریخ تولد پس از یک‌بار ثبت قفل می‌شود. (جهت اصلاح فقط با مدیریت هماهنگ کنید).
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <BirthdayPicker
-                      value={birthdayInput}
-                      onChange={(val) => setBirthdayInput(val)}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="flex items-center justify-center rounded-xl border border-white/10 bg-[#0c0c0c] px-4 py-3 text-xs text-neutral-400 hover:text-white transition"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={handleCompleteSubscription}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white p-3.5 font-bold text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] transition hover:bg-neutral-200 disabled:opacity-40"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-xs">{isPending ? "در حال ثبت..." : "تأیید و ورود"}</span>
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                step >= 1 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
+              }`}
+            >
+              ۱
+            </span>
+            <span className="text-neutral-700">──</span>
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                step >= 2 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
+              }`}
+            >
+              ۲
+            </span>
+            <span className="text-neutral-700">──</span>
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                step === 3 ? "bg-white text-black" : "bg-white/10 text-neutral-500"
+              }`}
+            >
+              ۳
+            </span>
           </div>
         </div>
-      )}
-    </>
+
+        {errorMsg && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-300">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* STEP 1: Phone */}
+        {step === 1 && (
+          <form onSubmit={handleNextStep1} className="space-y-4">
+            <div>
+              <div className="mb-1 flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-neutral-300" />
+                <label htmlFor="modal-phone" className="text-xs font-bold text-white">
+                  شماره موبایل
+                </label>
+              </div>
+              <input
+                id="modal-phone"
+                required
+                autoFocus
+                type="tel"
+                dir="ltr"
+                inputMode="numeric"
+                placeholder="09123456789"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-left font-mono text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white p-3 font-bold text-xs text-black hover:bg-neutral-200 active:scale-[0.99] transition"
+            >
+              <span>مرحله بعد</span>
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        )}
+
+        {/* STEP 2: Name */}
+        {step === 2 && (
+          <form onSubmit={handleNextStep2} className="space-y-4">
+            <div>
+              <div className="mb-1 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-neutral-300" />
+                <label htmlFor="modal-name" className="text-xs font-bold text-white">
+                  نام و نام خانوادگی
+                </label>
+              </div>
+              <input
+                id="modal-name"
+                required
+                autoFocus
+                type="text"
+                placeholder="مثال: علی رضایی"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-neutral-400 hover:text-white transition"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="submit"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white p-3 font-bold text-xs text-black hover:bg-neutral-200 active:scale-[0.99] transition"
+              >
+                <span>مرحله بعد</span>
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 3: Birthday */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Gift className="h-3.5 w-3.5 text-neutral-300" />
+                <span className="text-xs font-bold text-white">
+                  تاریخ تولد (اختیاری)
+                </span>
+              </div>
+              <span className="text-[10px] text-purple-300 font-semibold">
+                ۵۰٪ تخفیف هفته تولد
+              </span>
+            </div>
+
+            {profile.birthday ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-right space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-neutral-400">ثبت‌شده:</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
+                    <Lock className="h-3 w-3" />
+                    قفل شده
+                  </span>
+                </div>
+                <p className="font-bold text-sm text-white flex items-center gap-1.5">
+                  <Gift className="h-3.5 w-3.5 text-purple-400" />
+                  {parseBirthday(profile.birthday)?.formatted || profile.birthday}
+                </p>
+              </div>
+            ) : (
+              <BirthdayPicker
+                value={birthdayInput}
+                onChange={(val) => setBirthdayInput(val)}
+              />
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-neutral-400 hover:text-white transition"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleCompleteSubscription}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white p-3 font-bold text-xs text-black hover:bg-neutral-200 transition disabled:opacity-40"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{isPending ? "در حال ثبت..." : "تأیید و ذخیره"}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function CustomerOnboardingModal({
+  onProfileLoaded,
+  isOpenExternal,
+  onCloseExternal,
+}: Props) {
+  const profile = getSavedCustomerProfile();
+
+  if (!isOpenExternal) return null;
+
+  return (
+    <ModalContent
+      key={profile.phone || "new"}
+      profile={profile}
+      onClose={() => {
+        if (onCloseExternal) onCloseExternal();
+      }}
+      onProfileLoaded={onProfileLoaded}
+    />
   );
 }

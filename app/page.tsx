@@ -22,12 +22,12 @@ export default async function Home() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black"
+      className="min-h-screen bg-[#070707] text-white selection:bg-white selection:text-black"
     >
-      {/* 1. Floating Glassy Navbar on Scroll */}
+      {/* 1. Header on scroll */}
       <GlassyHeader phone={shop.phone} shopName={shop.name} />
 
-      {/* 2. Seamless Full-width Faded Hero Section (No boxes) */}
+      {/* 2. Clean Hero */}
       <HeroSection
         name={shop.name}
         tagline={shop.tagline}
@@ -35,58 +35,44 @@ export default async function Home() {
         phone={shop.phone}
       />
 
-      {/* 3. High-end Marble Background Light Effects */}
+      {/* 3. Subtle background depth */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/[0.08] via-white/[0.01] to-transparent blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-white/[0.03] blur-3xl" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 space-y-12">
-        {/* 4. Main Content Grid (Mobile First: Timeline -> Products -> Booking) */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-          {/* Timeline of Events (Mobile: 1st under hero / Desktop: Left column) */}
-          <div
-            id="timeline"
-            className="order-1 scroll-mt-20 rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl lg:order-3 lg:col-span-3"
-          >
-            <EventsSection events={shop.events} />
-          </div>
+      <div className="relative mx-auto max-w-4xl px-4 pb-20 sm:px-6 space-y-16">
+        {/* 4. Booking Section (Center Stage) */}
+        <section id="booking" className="scroll-mt-20">
+          <Suspense fallback={null}>
+            <ErrorBanner />
+          </Suspense>
 
-          {/* Products Showcase (Mobile: 2nd under hero / Desktop: Right column) */}
-          <div className="order-2 rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl lg:order-1 lg:col-span-3">
-            <ProductsSection products={shop.products} />
-          </div>
+          <BookingForm minDate={iranToday()} />
+        </section>
 
-          {/* Booking Core (Mobile: 3rd / Desktop: Center column) */}
-          <div
-            id="booking"
-            className="order-3 scroll-mt-20 lg:order-2 lg:col-span-6"
-          >
-            <Suspense fallback={null}>
-              <ErrorBanner />
-            </Suspense>
-
-            <BookingForm minDate={iranToday()} />
-          </div>
-        </div>
-
-        {/* 5. Photo Gallery Section of Barbershop */}
-        <div className="rounded-3xl border border-white/[0.08] bg-[#080808]/90 p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+        {/* 5. Clean Gallery */}
+        <section id="gallery">
           <GallerySection gallery={shop.gallery} />
-        </div>
+        </section>
 
-        {/* 6. Minimalist Luxury Footer */}
-        <footer className="border-t border-white/[0.08] pt-8 pb-12 flex flex-wrap items-center justify-between gap-4 text-[11px] text-neutral-500">
+        {/* 6. Products & Events in a balanced 2-column grid */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ProductsSection products={shop.products} />
+          <EventsSection events={shop.events} />
+        </section>
+
+        {/* 7. Clean Minimalist Footer */}
+        <footer className="border-t border-white/10 pt-8 pb-10 flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-500">
           <p className="font-mono">
-            © {new Date().getFullYear()} {shop.name} — ALL RIGHTS RESERVED.
+            © {new Date().getFullYear()} {shop.name}
           </p>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-5">
             <a
               href={`tel:${shop.phone}`}
               className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition"
             >
-              <Phone className="h-3.5 w-3.5 text-neutral-300" />
+              <Phone className="h-3.5 w-3.5" />
               <span className="font-mono">{shop.phone}</span>
             </a>
 
@@ -97,14 +83,14 @@ export default async function Home() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition"
               >
-                <Camera className="h-3.5 w-3.5 text-neutral-300" />
+                <Camera className="h-3.5 w-3.5" />
                 <span className="font-mono">@{shop.instagram}</span>
               </a>
             )}
 
             <a
               href="/admin"
-              className="rounded-lg border border-white/10 px-2.5 py-1 text-neutral-400 hover:border-white/30 hover:text-white transition"
+              className="text-neutral-500 hover:text-neutral-300 transition"
             >
               ورود آرایشگر
             </a>
