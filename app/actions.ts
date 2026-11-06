@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSql } from "@/lib/db";
 import {
   SERVICES,
@@ -25,6 +26,7 @@ import { getShopConfig, saveShopConfig, type ProductItem, type EventItem } from 
 import { parseBirthday } from "@/lib/birthday";
 import { recordAnalyticsEvent } from "@/lib/analytics";
 import { addUnavailableRecords, deleteUnavailableRecord } from "@/lib/unavailable";
+import { dispatchUpcomingReminders, checkRemindersOpportunistically } from "@/lib/reminders";
 
 
 export async function bookAppointment(formData: FormData) {
@@ -124,33 +126,6 @@ export async function bookAppointment(formData: FormData) {
         ${birthday || null}
       )
     `;
-
-    // Upsert customer master record and track visits
-    await sql`
-      INSERT INTO customers (
-        phone,
-        name,
-        birthday,
-        total_visits,
-        last_visit_at,
-        updated_at
-      )
-      VALUES (
-        ${phone},
-        ${name},
-        ${birthday || null},
-        1,
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (phone) DO UPDATE
-      SET
-        name = EXCLUDED.name,
-        birthday = COALESCE(customers.birthday, EXCLUDED.birthday),
-        total_visits = customers.total_visits + 1,
-        last_visit_at = NOW(),
-        updated_at = NOW()
-    `;
   } catch (error) {
     const dbError = error as { code?: string };
 
@@ -161,28 +136,57 @@ export async function bookAppointment(formData: FormData) {
     throw error;
   }
 
+  after(async () => {
+    await Promise.allSettled([
+      // Upsert customer CRM record
+      sql`
+        INSERT INTO customers (
+          phone,
+          name,
+          birthday,
+          total_visits,
+          last_visit_at,
+          updated_at
+        )
+        VALUES (
+          ${phone},
+          ${name},
+          ${birthday || null},
+          1,
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (phone) DO UPDATE
+        SET
+          name = EXCLUDED.name,
+          birthday = COALESCE(customers.birthday, EXCLUDED.birthday),
+          total_visits = customers.total_visits + 1,
+          last_visit_at = NOW(),
+          updated_at = NOW()
+      `,
+      recordAnalyticsEvent({
+        eventName: "booking_success",
+        eventData: {
+          publicId,
+          service,
+          date,
+          time,
+          name,
+        },
+      }),
+      notifyBooking({
+        publicId,
+        service,
+        date,
+        time,
+        name,
+        phone,
+      }),
+      checkRemindersOpportunistically(),
+    ]);
+  });
+
   revalidatePath("/admin");
-
-  await recordAnalyticsEvent({
-    eventName: "booking_success",
-    eventData: {
-      publicId,
-      service,
-      date,
-      time,
-      name,
-    },
-  });
-
-  await notifyBooking({
-    publicId,
-    service,
-    date,
-    time,
-    name,
-    phone,
-  });
-
   redirect(`/success?id=${publicId}`);
 }
 
@@ -220,9 +224,11 @@ export async function cancelAppointment(formData: FormData) {
       AND status = 'booked'
   `;
 
-  await recordAnalyticsEvent({
-    eventName: "booking_cancelled",
-    eventData: { id, cancelledBy: "admin" },
+  after(async () => {
+    await recordAnalyticsEvent({
+      eventName: "booking_cancelled",
+      eventData: { id, cancelledBy: "admin" },
+    });
   });
 
   revalidatePath("/admin");
@@ -627,12 +633,14 @@ export async function cancelCustomerAppointment(publicId: string, rawPhone: stri
   revalidatePath("/my");
 
   // Alert the barber via Telegram in background
-  await notifyCancellation({
-    service: String(appt.service),
-    date: String(appt.appointment_date),
-    time: String(appt.appointment_time),
-    name: String(appt.customer_name),
-    phone: String(appt.phone),
+  after(async () => {
+    await notifyCancellation({
+      service: String(appt.service),
+      date: String(appt.appointment_date),
+      time: String(appt.appointment_time),
+      name: String(appt.customer_name),
+      phone: String(appt.phone),
+    });
   });
 
   return { success: true };
@@ -663,4 +671,16 @@ export async function updateCustomerName(rawPhone: string, newName: string) {
   revalidatePath("/my");
   return { success: true };
 }
+
+/** Admin: Trigger appointment reminders check immediately */
+export async function triggerManualReminders() {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const result = await dispatchUpcomingReminders();
+  revalidatePath("/admin");
+  redirect(`/admin?tab=appointments&reminded=${result.sentCount}`);
+}
+
 

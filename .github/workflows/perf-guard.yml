@@ -37,7 +37,7 @@ jobs:
         run: |
           for attempt in 1 2 3 4 5; do
             echo "::group::attempt $attempt"
-            if node scripts/perf-guard.mjs https://brbitime.vercel.app; then
+            if node scripts/perf-guard.mjs https://muucut.ir; then
               echo "::endgroup::"
               exit 0
             fi

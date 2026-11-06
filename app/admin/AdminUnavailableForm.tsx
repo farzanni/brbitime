@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { DayPicker, faIR } from "@daypicker/persian";
 import "@daypicker/react/style.css";
-import { WORK_HOURS } from "@/lib/booking";
+import { WORK_HOURS, formatPersianDate } from "@/lib/booking";
 import { addUnavailableTimes } from "@/app/actions";
 import { Calendar, Clock, Ban, Check, Plus, AlertCircle } from "lucide-react";
 
@@ -24,14 +24,7 @@ export default function AdminUnavailableForm({ minDate }: AdminUnavailableFormPr
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const formattedPersianDate = selectedDate
-    ? new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(selectedDate)
-    : "";
+  const formattedPersianDate = selectedDate ? formatPersianDate(selectedDate) : "";
 
   const toggleHour = (hour: string) => {
     const timeSlot = `${hour}:۰۰`;

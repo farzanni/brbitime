@@ -52,15 +52,19 @@ export default async function Home() {
         </section>
 
         {/* 5. Clean Gallery */}
-        <section id="gallery">
+        <section id="gallery" className="scroll-mt-20">
           <GallerySection gallery={shop.gallery} />
         </section>
 
         {/* 6. Products & Events in a balanced 2-column grid */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ProductsSection products={shop.products} />
-          <EventsSection events={shop.events} />
-        </section>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <section id="products" className="scroll-mt-20">
+            <ProductsSection products={shop.products} />
+          </section>
+          <section id="discounts" className="scroll-mt-20">
+            <EventsSection events={shop.events} />
+          </section>
+        </div>
 
         {/* 7. Clean Minimalist Footer */}
         <footer className="border-t border-white/10 pt-8 pb-10 flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-500">

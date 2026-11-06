@@ -1,4 +1,5 @@
 import { SHOP } from "@/lib/shop";
+import { formatPersianDate } from "@/lib/booking";
 
 export interface BookingSmsPayload {
   customerName: string;
@@ -70,8 +71,10 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
   const sender = process.env.SMS_SENDER || "2000660110";
   const barberPhones = getBarberPhones();
 
-  const customerMessage = `سلام ${payload.customerName} عزیز، نوبت شما در ${shopName} برای خدمت ${payload.serviceName} در تاریخ ${payload.date} ساعت ${payload.time} با موفقیت ثبت شد.`;
-  const barberMessage = `نوبت جدید: ${payload.customerName} | ${payload.serviceName} | ${payload.date} ساعت ${payload.time} | تماس: ${payload.customerPhone}`;
+  const formattedDate = formatPersianDate(payload.date);
+
+  const customerMessage = `سلام ${payload.customerName} عزیز، نوبت شما در ${shopName} برای خدمت ${payload.serviceName} در تاریخ ${formattedDate} ساعت ${payload.time} با موفقیت ثبت شد.`;
+  const barberMessage = `نوبت جدید: ${payload.customerName} | ${payload.serviceName} | ${formattedDate} ساعت ${payload.time} | تماس: ${payload.customerPhone}`;
 
   try {
     if (provider === "kavenegar") {
@@ -84,7 +87,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
         const params = new URLSearchParams({
           receptor: payload.customerPhone,
           token: payload.customerName.replace(/\s+/g, "."),
-          token2: payload.date,
+          token2: formattedDate.replace(/\s+/g, "."),
           token3: payload.time,
           template: template,
         });
@@ -116,7 +119,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
             values: {
               name: payload.customerName,
               service: payload.serviceName,
-              date: payload.date,
+              date: formattedDate,
               time: payload.time,
             },
           }),
@@ -161,3 +164,89 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
     console.error("SMS notification failed:", err);
   }
 }
+
+export interface ReminderSmsPayload {
+  customerName: string;
+  customerPhone: string;
+  serviceName: string;
+  date: string;
+  time: string;
+}
+
+/**
+ * Sends a 30-minute appointment reminder SMS to the customer.
+ * Never throws — SMS failure must never crash cron or caller.
+ */
+export async function sendAppointmentReminderSms(payload: ReminderSmsPayload): Promise<boolean> {
+  const provider = getProvider();
+  const shopName = SHOP.name || "مو کات";
+  const sender = process.env.SMS_SENDER || "2000660110";
+
+  const customerMessage = `سلام ${payload.customerName} عزیز،\nیادآوری: نوبت شما در ${shopName} تا حدود ۳۰ دقیقه دیگر (ساعت ${payload.time}) برای خدمت ${payload.serviceName} می‌باشد. منتظر دیدارتان هستیم.`;
+
+  try {
+    if (provider === "kavenegar") {
+      const apiKey = process.env.KAVENEGAR_API_KEY ?? "";
+      const template = process.env.KAVENEGAR_PATTERN_REMINDER;
+
+      if (template) {
+        const params = new URLSearchParams({
+          receptor: payload.customerPhone,
+          token: payload.customerName.replace(/\s+/g, "."),
+          token2: payload.time.replace(/\s+/g, "."),
+          token3: shopName.replace(/\s+/g, "."),
+          template: template,
+        });
+        await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`);
+      } else {
+        await sendKavenegarSms(apiKey, payload.customerPhone, customerMessage, sender);
+      }
+      return true;
+    } else if (provider === "farazsms") {
+      const apiKey = process.env.FARAZSMS_API_KEY || process.env.IPPANEL_API_KEY || "";
+      const patternCode = process.env.FARAZSMS_PATTERN_REMINDER;
+      const originPhone = sender || "+983000505";
+
+      if (patternCode) {
+        await fetch("https://edge.ippanel.com/api/v1/pattern/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `AccessKey ${apiKey}`,
+          },
+          body: JSON.stringify({
+            pattern_code: patternCode,
+            originator: originPhone,
+            recipient: payload.customerPhone,
+            values: {
+              name: payload.customerName,
+              service: payload.serviceName,
+              time: payload.time,
+            },
+          }),
+        });
+      } else {
+        await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `AccessKey ${apiKey}`,
+          },
+          body: JSON.stringify({
+            recipient: [payload.customerPhone],
+            sender: originPhone,
+            message: customerMessage,
+          }),
+        });
+      }
+      return true;
+    } else {
+      console.log(`[SMS MOCK REMINDER] Customer (${payload.customerPhone}): ${customerMessage}`);
+      return true;
+    }
+  } catch (err) {
+    console.error(`[SMS Reminder Error] Failed to send reminder to ${payload.customerPhone}:`, err);
+    return false;
+  }
+}
+

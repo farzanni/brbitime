@@ -364,14 +364,21 @@ export async function getBusinessAnalytics(
   let apptDateFilter = sql``;
   let eventDateFilter = sql``;
 
+  function getPastIsoDate(daysAgo: number): string {
+    const d = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
   if (range === "today") {
     apptDateFilter = sql`WHERE appointment_date = ${todayStr}`;
     eventDateFilter = sql`WHERE created_at >= (${todayStr}::date AT TIME ZONE 'Asia/Tehran')`;
   } else if (range === "7d") {
-    apptDateFilter = sql`WHERE appointment_date::date >= (${todayStr}::date - INTERVAL '7 days')`;
+    const minDate = getPastIsoDate(7);
+    apptDateFilter = sql`WHERE appointment_date >= ${minDate}`;
     eventDateFilter = sql`WHERE created_at >= NOW() - INTERVAL '7 days'`;
   } else if (range === "30d") {
-    apptDateFilter = sql`WHERE appointment_date::date >= (${todayStr}::date - INTERVAL '30 days')`;
+    const minDate = getPastIsoDate(30);
+    apptDateFilter = sql`WHERE appointment_date >= ${minDate}`;
     eventDateFilter = sql`WHERE created_at >= NOW() - INTERVAL '30 days'`;
   }
 

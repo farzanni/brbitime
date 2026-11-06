@@ -3,9 +3,11 @@ import Image from "next/image";
 export default function BrandLogo({
   size = "md",
   className = "",
+  priority = false,
 }: {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  priority?: boolean;
 }) {
   const dim = size === "sm" ? 38 : size === "md" ? 56 : size === "lg" ? 116 : 152;
   const src = size === "sm" ? "/emblem.webp" : "/logo.webp";
@@ -21,7 +23,7 @@ export default function BrandLogo({
         fill
         sizes={`${dim}px`}
         className="object-contain object-center drop-shadow-[0_2px_16px_rgba(255,255,255,0.18)]"
-        priority
+        priority={priority}
       />
     </div>
   );

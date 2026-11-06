@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import { SERVICES, iranToday } from "@/lib/booking";
+import { SERVICES, iranToday, formatPersianDate } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
 import { getShopConfig } from "@/lib/shop";
 import { checkBirthdayStatus } from "@/lib/birthday";
@@ -15,6 +15,7 @@ import {
   deleteEvent,
   updateCustomerNote,
   deleteUnavailableTime,
+  triggerManualReminders,
 } from "../actions";
 import {
   Calendar,
@@ -36,6 +37,7 @@ import {
   CalendarOff,
   Ban,
   AlertCircle,
+  Bell,
 } from "lucide-react";
 import AnalyticsView from "./AnalyticsView";
 import AdminUnavailableForm from "./AdminUnavailableForm";
@@ -52,6 +54,7 @@ type Appointment = {
   customer_name: string;
   phone: string;
   customer_birthday?: string | null;
+  reminder_sent_at?: string | null;
 };
 
 type Customer = {
@@ -68,10 +71,10 @@ type Customer = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; tab?: string; saved?: string; range?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; saved?: string; range?: string; reminded?: string }>;
 }) {
   const params = await searchParams;
-  const { error, tab = "appointments", saved, range = "30d" } = params;
+  const { error, tab = "appointments", saved, range = "30d", reminded } = params;
 
   if (!(await isAdmin())) {
     return (
@@ -117,37 +120,12 @@ export default async function AdminPage({
   }
 
   const sql = getSql();
-  const appointments = (await sql`
-    SELECT
-      id,
-      service,
-      appointment_date,
-      appointment_time,
-      customer_name,
-      phone,
-      customer_birthday
-    FROM appointments
-    WHERE status = 'booked'
-      AND appointment_date >= ${iranToday()}
-    ORDER BY appointment_date, appointment_time
-  `) as Appointment[];
-
-  const customers = (await sql`
-    SELECT
-      id,
-      phone,
-      name,
-      birthday,
-      notes,
-      total_visits,
-      last_visit_at,
-      created_at
-    FROM customers
-    ORDER BY last_visit_at DESC NULLS LAST, id DESC
-  `) as Customer[];
-
-  const shop = await getShopConfig();
-  const unavailableTimes = await getUnavailableTimes(iranToday());
+  const [appointments, customers, shop, unavailableTimes] = await Promise.all([
+    (sql`SELECT id, service, appointment_date, appointment_time, customer_name, phone, customer_birthday, reminder_sent_at FROM appointments WHERE status = 'booked' AND appointment_date >= ${iranToday()} ORDER BY appointment_date, appointment_time` as unknown as Promise<Appointment[]>),
+    (sql`SELECT id, phone, name, birthday, notes, total_visits, last_visit_at, created_at FROM customers ORDER BY last_visit_at DESC NULLS LAST, id DESC` as unknown as Promise<Customer[]>),
+    getShopConfig(),
+    getUnavailableTimes(iranToday()),
+  ]);
 
   const validRange = (["today", "7d", "30d", "all"].includes(range) ? range : "30d") as TimeRange;
   const analyticsData = tab === "analytics" ? await getBusinessAnalytics(validRange) : null;
@@ -271,10 +249,35 @@ export default async function AdminPage({
           </div>
         )}
 
+        {reminded !== undefined && (
+          <div className="mb-6 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-xs text-emerald-300">
+            <CheckCircle className="h-4 w-4" />
+            {Number(reminded) > 0
+              ? `بررسی انجام شد: پیامک یادآوری ۳۰ دقیقه قبل برای ${reminded} مشتری ارسال گردید.`
+              : "بررسی انجام شد: نوبتی در بازه ۳۰ دقیقه قبل از شروع که نیاز به پیامک داشته باشد، یافت نشد."}
+          </div>
+        )}
+
         {/* TAB 1: Appointments */}
         {tab === "appointments" && (
           <section className="space-y-4">
-            <h2 className="text-lg font-bold">لیست نوبت‌های پیش‌رو</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold">لیست نوبت‌های پیش‌رو</h2>
+                <p className="text-xs text-neutral-400">
+                  سیستم به‌طور خودکار ۳۰ دقیقه قبل از هر نوبت، پیامک یادآوری به مشتری ارسال می‌کند.
+                </p>
+              </div>
+              <form action={triggerManualReminders}>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3.5 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 active:scale-95 transition"
+                >
+                  <Bell className="h-3.5 w-3.5" />
+                  بررسی و ارسال فوری یادآوری‌ها
+                </button>
+              </form>
+            </div>
 
             {appointments.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-900/30 p-12 text-center text-sm text-neutral-500">
@@ -308,7 +311,7 @@ export default async function AdminPage({
 
                           <div className="flex items-center gap-2 font-mono text-xs text-amber-300">
                             <Clock className="h-3.5 w-3.5 text-amber-400" />
-                            <span>{appointment.appointment_date}</span>
+                            <span>{formatPersianDate(appointment.appointment_date)}</span>
                             <span>•</span>
                             <span>ساعت {appointment.appointment_time}</span>
                           </div>
@@ -346,6 +349,20 @@ export default async function AdminPage({
                               </div>
                             );
                           })()}
+
+                          <div className="flex items-center gap-2 pt-0.5">
+                            {appointment.reminder_sent_at ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                                <CheckCircle className="h-3 w-3 text-emerald-400" />
+                                پیامک یادآوری ارسال شد
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-800 bg-neutral-850 px-2.5 py-1 text-[11px] text-neutral-400">
+                                <Bell className="h-3 w-3 text-amber-400/80" />
+                                ارسال پیامک ۳۰ دقیقه قبل
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <form action={cancelAppointment}>
@@ -745,7 +762,7 @@ export default async function AdminPage({
                   </h3>
                 </div>
                 <span className="font-mono text-xs text-neutral-500">
-                  از تاریخ {iranToday()} به بعد
+                  از تاریخ {formatPersianDate(iranToday())} به بعد
                 </span>
               </div>
 
@@ -757,18 +774,7 @@ export default async function AdminPage({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {unavailableTimes.map((item) => {
                     const isAllDay = item.time === "all-day" || item.time === "all" || item.time === "کل روز";
-                    let persianDateDisplay = item.date;
-                    try {
-                      const d = new Date(item.date + "T00:00:00");
-                      persianDateDisplay = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }).format(d);
-                    } catch {
-                      persianDateDisplay = item.date;
-                    }
+                    const persianDateDisplay = formatPersianDate(item.date);
 
                     return (
                       <article

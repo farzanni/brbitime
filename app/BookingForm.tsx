@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DayPicker, faIR } from "@daypicker/persian";
 import "@daypicker/react/style.css";
 import { bookAppointment } from "./actions";
@@ -10,6 +10,7 @@ import {
   isHaircutService,
   getSlotsForService,
   getIranDateTime,
+  formatPersianDate,
   type BookedAppointmentInfo,
   type UnavailableSlotInfo,
   type SlotOption,
@@ -71,6 +72,19 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     isAllDayUnavailable: false,
     allDayNote: null,
   });
+  const availabilityCache = useRef<
+    Record<
+      string,
+      {
+        date: string;
+        times: string[];
+        appointments: BookedAppointmentInfo[];
+        unavailable: UnavailableSlotInfo[];
+        isAllDayUnavailable: boolean;
+        allDayNote: string | null;
+      }
+    >
+  >({});
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -102,12 +116,18 @@ export default function BookingForm({ minDate }: { minDate: string }) {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setNow(new Date());
+      setNow((prev) => {
+        const next = new Date();
+        return next.getMinutes() !== prev.getMinutes() ? next : prev;
+      });
     }, 15_000);
     return () => clearInterval(timer);
   }, []);
 
-  const iranNow = useMemo(() => getIranDateTime(now), [now]);
+  const iranNowRaw = getIranDateTime(now);
+  const iranMinuteKey = `${iranNowRaw.date}_${iranNowRaw.hour}_${iranNowRaw.minute}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const iranNow = useMemo(() => iranNowRaw, [iranMinuteKey]);
   const effectiveMinDate = minDate && minDate >= iranNow.date ? minDate : iranNow.date;
 
   const slots: SlotOption[] = useMemo(() => {
@@ -134,6 +154,11 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   useEffect(() => {
     if (!date) return;
 
+    if (availabilityCache.current[date]) {
+      setAvailability(availabilityCache.current[date]);
+      return;
+    }
+
     const controller = new AbortController();
 
     async function loadAvailability() {
@@ -143,7 +168,6 @@ export default function BookingForm({ minDate }: { minDate: string }) {
         const response = await fetch(
           `/api/availability?date=${encodeURIComponent(date)}`,
           {
-            cache: "no-store",
             signal: controller.signal,
           },
         );
@@ -151,14 +175,18 @@ export default function BookingForm({ minDate }: { minDate: string }) {
         if (!response.ok) return;
 
         const data = await response.json();
-        setAvailability({
+        const nextData = {
           date,
           times: data.bookedTimes || [],
           appointments: data.appointments || [],
           unavailable: data.unavailable || [],
           isAllDayUnavailable: Boolean(data.isAllDayUnavailable),
           allDayNote: data.allDayNote || null,
-        });
+        };
+        availabilityCache.current[date] = nextData;
+        setAvailability(nextData);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
       } finally {
         setLoading(false);
       }
@@ -168,6 +196,24 @@ export default function BookingForm({ minDate }: { minDate: string }) {
 
     return () => controller.abort();
   }, [date]);
+
+  useEffect(() => {
+    if (!effectiveMinDate || availabilityCache.current[effectiveMinDate]) return;
+    fetch(`/api/availability?date=${encodeURIComponent(effectiveMinDate)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        availabilityCache.current[effectiveMinDate] = {
+          date: effectiveMinDate,
+          times: data.bookedTimes || [],
+          appointments: data.appointments || [],
+          unavailable: data.unavailable || [],
+          isAllDayUnavailable: Boolean(data.isAllDayUnavailable),
+          allDayNote: data.allDayNote || null,
+        };
+      })
+      .catch(() => {});
+  }, [effectiveMinDate]);
 
   const activeBirthday = hasSavedProfile ? profile.birthday : inputBirthday;
   const birthdayStatus = activeBirthday ? checkBirthdayStatus(activeBirthday, date || undefined) : null;
@@ -319,10 +365,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                 </div>
                 {selectedDate ? (
                   <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-white font-mono">
-                    {new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-                      day: "numeric",
-                      month: "short",
-                    }).format(selectedDate)}
+                    {formatPersianDate(selectedDate)}
                   </span>
                 ) : (
                   <span className="text-[11px] text-neutral-500 font-mono">
@@ -384,11 +427,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-white">
                     {selectedDate
-                      ? new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        }).format(selectedDate)
+                      ? formatPersianDate(selectedDate)
                       : "انتخاب ساعت"}
                   </span>
                   <span className="text-[10px] text-neutral-400 mt-0.5">
@@ -444,7 +483,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                     {slots.map((slot) => {
                       const isSelected = activeSelectedTime === slot.time;
                       const isSlotDisabled =
-                        slot.isBooked || slot.isPassed || loading;
+                        slot.isBooked || slot.isPassed || slot.isUnavailable || loading;
 
                       return (
                         <label

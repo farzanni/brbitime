@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSql } from "@/lib/db";
-import { SERVICES } from "@/lib/booking";
+import { SERVICES, formatPersianDate } from "@/lib/booking";
 import { getShopConfig } from "@/lib/shop";
 import BrandLogo from "../BrandLogo";
 
@@ -77,7 +77,7 @@ export default async function SuccessPage({
             <div className="mt-6 space-y-2 rounded-2xl border border-neutral-800 bg-neutral-900 p-5 text-sm">
               <p>💈 {serviceName}</p>
               <p>
-                📅 {appointment.appointment_date} — ⏰{" "}
+                📅 {formatPersianDate(appointment.appointment_date)} — ⏰{" "}
                 {appointment.appointment_time}
               </p>
               {shop.address && (

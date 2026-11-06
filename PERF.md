@@ -192,14 +192,14 @@ measurement.
 ```bash
 # The metric that matters: real-network TTFB (run from Iran)
 for i in $(seq 1 12); do curl -sS -o /dev/null -w '%{time_starttransfer}\n' \
-  "https://brbitime.vercel.app/api/availability?date=$(date -d tomorrow +%F)"; done
+  "https://muucut.ir/api/availability?date=$(date -d tomorrow +%F)"; done
 
 # Infrastructure facts
-curl -sSI https://brbitime.vercel.app/ | grep -iE 'cache-control|x-vercel-cache|x-nextjs-prerender'
-curl -sSI "https://brbitime.vercel.app/api/availability?date=$(date -d tomorrow +%F)" | grep -i x-vercel-id
+curl -sSI https://muucut.ir/ | grep -iE 'cache-control|x-vercel-cache|x-nextjs-prerender'
+curl -sSI "https://muucut.ir/api/availability?date=$(date -d tomorrow +%F)" | grep -i x-vercel-id
 
 # Synthetic (unchanged by design — do not use to judge this work)
-CHROME_PATH=/usr/bin/chromium npx lighthouse@12 https://brbitime.vercel.app/ \
+CHROME_PATH=/usr/bin/chromium npx lighthouse@12 https://muucut.ir/ \
   --only-categories=performance --output=json --output-path=./lh.json
 
 # The guard

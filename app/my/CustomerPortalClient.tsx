@@ -35,22 +35,8 @@ import {
   getSavedCustomerProfile,
   saveCustomerProfile,
 } from "@/lib/customerCache";
-import { SERVICES } from "@/lib/booking";
+import { SERVICES, formatPersianDate } from "@/lib/booking";
 import { trackClientEvent } from "@/lib/analytics-client";
-
-function formatPersianDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(d);
-  } catch {
-    return dateStr;
-  }
-}
 
 function getServiceName(serviceId: string): string {
   if (serviceId === "combo") return "پکیج کامل (مو + ریش)";

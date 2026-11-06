@@ -9,10 +9,13 @@ export interface UnavailableTime {
   created_at: string;
 }
 
+let tableEnsured = false;
+
 /**
  * Ensures the unavailable_times table exists with appropriate indexes.
  */
 export async function ensureUnavailableTimesTable(): Promise<void> {
+  if (tableEnsured) return;
   const sql = getSql();
   try {
     await sql`
@@ -32,6 +35,7 @@ export async function ensureUnavailableTimesTable(): Promise<void> {
       CREATE INDEX IF NOT EXISTS unavailable_times_date_idx
       ON unavailable_times (date)
     `;
+    tableEnsured = true;
   } catch (err) {
     console.error("Error creating unavailable_times table:", err);
   }
@@ -109,19 +113,23 @@ export async function addUnavailableRecords(
   note?: string
 ): Promise<void> {
   const sql = getSql();
-  await ensureUnavailableTimesTable();
+  if (!tableEnsured) {
+    await ensureUnavailableTimesTable();
+  }
 
   const cleanNote = note?.trim() || null;
 
-  for (const t of times) {
-    const cleanTime = t === "all-day" ? "all-day" : toPersianDigits(t.trim());
-    await sql`
-      INSERT INTO unavailable_times (date, time, note, created_at)
-      VALUES (${date}, ${cleanTime}, ${cleanNote}, NOW())
-      ON CONFLICT (date, time) DO UPDATE
-      SET note = EXCLUDED.note
-    `;
-  }
+  await Promise.all(
+    times.map((t) => {
+      const cleanTime = t === "all-day" ? "all-day" : toPersianDigits(t.trim());
+      return sql`
+        INSERT INTO unavailable_times (date, time, note, created_at)
+        VALUES (${date}, ${cleanTime}, ${cleanNote}, NOW())
+        ON CONFLICT (date, time) DO UPDATE
+        SET note = EXCLUDED.note
+      `;
+    })
+  );
 }
 
 /**

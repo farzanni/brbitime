@@ -1,4 +1,4 @@
-import { SERVICES } from "@/lib/booking";
+import { SERVICES, formatPersianDate } from "@/lib/booking";
 import { sendBookingSms } from "@/lib/sms";
 
 const SERVICE_NAMES: Record<string, string> = {
@@ -45,6 +45,53 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;");
 }
 
+function normalizeTelegramChatId(chatId: string): string {
+  const trimmed = chatId.trim();
+  // Telegram Supergroup/Channel IDs are 13 digits starting with -100
+  // If an ID starts with a single '-' and has 9-11 digits (e.g. -5514479498), auto-prefix with -100
+  if (/^-[0-9]{9,11}$/.test(trimmed)) {
+    return `-100${trimmed.slice(1)}`;
+  }
+  return trimmed;
+}
+
+async function sendTelegramMessage(token: string, rawChatId: string, text: string): Promise<void> {
+  const primaryChatId = normalizeTelegramChatId(rawChatId);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: primaryChatId,
+        text,
+        parse_mode: "HTML",
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) return;
+    const errorBody = await res.text();
+    // Fallback: If Telegram returns 400 'chat not found' and the raw ID had a leading '-',
+    // the user may have mistakenly prepended '-' to a private user ID. Try positive user ID.
+    if (res.status === 400 && errorBody.includes("chat not found") && rawChatId.startsWith("-")) {
+      const fallbackChatId = rawChatId.replace(/^-+/, "").trim();
+      const retryRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: fallbackChatId,
+          text,
+          parse_mode: "HTML",
+        }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (retryRes.ok) return;
+    }
+    console.error("telegram notification failed for chat:", primaryChatId.slice(0, 5), errorBody);
+  } catch (error) {
+    console.error("telegram notification network error:", error);
+  }
+}
+
 /**
  * Sends a booking notification to SMS (customer & barber) and
  * to configured Telegram targets (shop owner, operator, ...).
@@ -59,6 +106,7 @@ export async function notifyBooking(input: {
   phone: string;
 }): Promise<void> {
   const serviceTitle = SERVICE_NAMES[input.service] ?? input.service;
+  const formattedDate = formatPersianDate(input.date);
 
   // Send SMS to customer & barber (runs safely in background without throwing)
   const smsPromise = sendBookingSms({
@@ -88,37 +136,13 @@ export async function notifyBooking(input: {
     `👤 ${escapeHtml(input.name)}`,
     `📞 <code>${escapeHtml(input.phone)}</code>`,
     `💈 ${escapeHtml(serviceTitle)}`,
-    `📅 ${escapeHtml(input.date)} — ⏰ ${escapeHtml(input.time)}`,
+    `📅 ${escapeHtml(formattedDate)} — ⏰ ${escapeHtml(input.time)}`,
     manageLink,
   ].join("\n");
 
-  const telegramPromises = targets.map(async ({ token, chatId }) => {
-    try {
-      const response = await fetch(
-        `https://api.telegram.org/bot${token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            parse_mode: "HTML",
-          }),
-          signal: AbortSignal.timeout(8000),
-        },
-      );
-
-      if (!response.ok) {
-        console.error(
-          "telegram notification failed:",
-          chatId.slice(0, 4),
-          await response.text(),
-        );
-      }
-    } catch (error) {
-      console.error("telegram notification error:", error);
-    }
-  });
+  const telegramPromises = targets.map(({ token, chatId }) =>
+    sendTelegramMessage(token, chatId, text)
+  );
 
   await Promise.allSettled([smsPromise, ...telegramPromises]);
 }
@@ -137,6 +161,7 @@ export async function notifyCancellation(input: CancelNotificationInput) {
 
   const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
   const manageLink = appUrl ? `\nمدیریت: ${appUrl}/admin` : "";
+  const formattedDate = formatPersianDate(input.date);
 
   const text = [
     "⚠️ <b>لغو نوبت توسط مشتری!</b>",
@@ -144,26 +169,13 @@ export async function notifyCancellation(input: CancelNotificationInput) {
     `👤 ${escapeHtml(input.name)}`,
     `📞 <code>${escapeHtml(input.phone)}</code>`,
     `💈 ${escapeHtml(SERVICE_NAMES[input.service] ?? input.service)}`,
-    `📅 ${escapeHtml(input.date)} — ⏰ ${escapeHtml(input.time)}`,
+    `📅 ${escapeHtml(formattedDate)} — ⏰ ${escapeHtml(input.time)}`,
     manageLink,
   ].join("\n");
 
-  await Promise.allSettled(
-    targets.map(async ({ token, chatId }) => {
-      try {
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            parse_mode: "HTML",
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
-      } catch (error) {
-        console.error("telegram cancel notification error:", error);
-      }
-    })
+  const telegramPromises = targets.map(({ token, chatId }) =>
+    sendTelegramMessage(token, chatId, text)
   );
+
+  await Promise.allSettled(telegramPromises);
 }

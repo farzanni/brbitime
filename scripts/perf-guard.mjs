@@ -10,7 +10,7 @@
  *   3. the availability endpoint going back to `no-store`.
  *
  * Usage: node scripts/perf-guard.mjs [base-url]
- * Default base URL: https://brbitime.vercel.app
+ * Default base URL: https://muucut.ir
  * Exit code 0 = all good, 1 = at least one guard failed.
  */
 

@@ -308,3 +308,47 @@ export function getSlotsForService(
 export function iranToday(): string {
   return getIranDateTime().date;
 }
+
+/**
+ * Formats an ISO date (YYYY-MM-DD) or Date object into standard Persian format:
+ * "weekday day month" (weekday in text, day in num, month in text).
+ * Example: "2026-11-06" -> "جمعه ۱۵ آبان"
+ */
+export function formatPersianDate(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "";
+  try {
+    if (typeof dateInput === "string") {
+      const trimmed = dateInput.trim();
+      const parts = trimmed.split("-");
+      if (parts.length === 3 && parts[0].length === 4) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        // Noon UTC ensures the date remains identical across all timezones including Asia/Tehran
+        const d = new Date(Date.UTC(year, month, day, 12, 0, 0));
+        return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+          timeZone: "Asia/Tehran",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }).format(d);
+      }
+      const d = new Date(trimmed);
+      return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+        timeZone: "Asia/Tehran",
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }).format(d);
+    }
+    return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "Asia/Tehran",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(dateInput);
+  } catch {
+    return String(dateInput);
+  }
+}
+
