@@ -54,20 +54,15 @@ export default function CustomerPortalClient({
   shopAddress?: string;
   shopMapUrl?: string;
 }) {
-  const [phone, setPhone] = useState("");
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const [phone, setPhone] = useState(() => (typeof window === "undefined" ? "" : getSavedCustomerProfile().phone || ""));
   const [inputPhone, setInputPhone] = useState("");
   const [data, setData] = useState<CustomerPortalData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    const saved = getSavedCustomerProfile();
-    if (saved.phone) {
-      setPhone(saved.phone);
-      setIsLoading(true);
-    }
-  }, []);
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">("upcoming");
   const [cancellingAppt, setCancellingAppt] = useState<CustomerPortalAppointment | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);

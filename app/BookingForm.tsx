@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { DayPicker, faIR } from "@daypicker/persian";
 import "@daypicker/react/style.css";
 import { bookAppointment } from "./actions";
@@ -90,22 +90,13 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   const [isPending, startTransition] = useTransition();
 
   // Customer state
-  const [profile, setProfile] = useState<CustomerProfile>({
-    name: "",
-    phone: "",
-    birthday: "",
-    isSubscribed: false,
-  });
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    const saved = getSavedCustomerProfile();
-    if (saved.phone || saved.name) {
-      setProfile(saved);
-    }
-  }, []);
 
   // Unregistered inline customer inputs
   const [inputName, setInputName] = useState("");
