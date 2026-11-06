@@ -531,7 +531,14 @@ export async function getBusinessAnalytics(
     }
 
     // Source tracking
-    const rawSource = ev.utm_source || (ev.referrer ? new URL(ev.referrer, "https://dummy").hostname : null);
+    let rawSource = ev.utm_source || null;
+    if (!rawSource && ev.referrer) {
+      try {
+        rawSource = new URL(ev.referrer, "https://dummy").hostname;
+      } catch {
+        rawSource = null;
+      }
+    }
     const sourceKey = rawSource ? rawSource.toLowerCase() : "direct";
 
     if (!sourceStatsMap.has(sourceKey)) {

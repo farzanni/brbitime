@@ -1,0 +1,27 @@
+name: appointment-reminders
+
+# Triggers the 30-minute appointment reminder check on an automated schedule.
+# Runs every 10 minutes so customers receive their SMS reminder ~30 minutes
+# prior to their appointment without requiring user visits.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger 30-min appointment reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          URL="https://muucut.ir/api/cron/reminders"
+          echo "Invoking reminder cron on muucut.ir..."
+          if [ -n "$CRON_SECRET" ]; then
+            curl -sS -f -X GET -H "Authorization: Bearer $CRON_SECRET" "$URL"
+          else
+            curl -sS -f -X GET "$URL"
+          fi

@@ -6,7 +6,7 @@ import "@daypicker/react/style.css";
 import { bookAppointment } from "./actions";
 import {
   SERVICES,
-  normalizeDigits,
+  cleanIranPhone,
   isHaircutService,
   getSlotsForService,
   getIranDateTime,
@@ -85,12 +85,27 @@ export default function BookingForm({ minDate }: { minDate: string }) {
       }
     >
   >({});
+  const inFlightPrefetch = useRef<Record<string, Promise<unknown> | undefined>>({});
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Customer state
-  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
+  const [profile, setProfile] = useState<CustomerProfile>({
+    name: "",
+    phone: "",
+    birthday: "",
+    isSubscribed: false,
+  });
+  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = getSavedCustomerProfile();
+    if (saved.phone || saved.name) {
+      setProfile(saved);
+    }
+  }, []);
 
   // Unregistered inline customer inputs
   const [inputName, setInputName] = useState("");
@@ -99,7 +114,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const hasSavedProfile = Boolean(profile.name && profile.phone);
+  const hasSavedProfile = isMounted && Boolean(profile.name && profile.phone);
 
   const handleProfileLoaded = (updated: CustomerProfile) => {
     setProfile(updated);
@@ -165,6 +180,15 @@ export default function BookingForm({ minDate }: { minDate: string }) {
       setLoading(true);
 
       try {
+        const pendingPrefetch = inFlightPrefetch.current[date];
+        if (pendingPrefetch) {
+          await pendingPrefetch;
+          if (availabilityCache.current[date]) {
+            setAvailability(availabilityCache.current[date]);
+            return;
+          }
+        }
+
         const response = await fetch(
           `/api/availability?date=${encodeURIComponent(date)}`,
           {
@@ -198,8 +222,16 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   }, [date]);
 
   useEffect(() => {
-    if (!effectiveMinDate || availabilityCache.current[effectiveMinDate]) return;
-    fetch(`/api/availability?date=${encodeURIComponent(effectiveMinDate)}`)
+    if (
+      !effectiveMinDate ||
+      availabilityCache.current[effectiveMinDate] ||
+      Boolean(inFlightPrefetch.current[effectiveMinDate])
+    )
+      return;
+
+    const fetchPromise = fetch(
+      `/api/availability?date=${encodeURIComponent(effectiveMinDate)}`
+    )
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data) return;
@@ -212,7 +244,12 @@ export default function BookingForm({ minDate }: { minDate: string }) {
           allDayNote: data.allDayNote || null,
         };
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        delete inFlightPrefetch.current[effectiveMinDate];
+      });
+
+    inFlightPrefetch.current[effectiveMinDate] = fetchPromise;
   }, [effectiveMinDate]);
 
   const activeBirthday = hasSavedProfile ? profile.birthday : inputBirthday;
@@ -223,7 +260,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     setFormError("");
 
     const nameToUse = hasSavedProfile ? profile.name : inputName.trim();
-    const phoneToUse = normalizeDigits(hasSavedProfile ? profile.phone : inputPhone.trim());
+    const phoneToUse = cleanIranPhone(hasSavedProfile ? profile.phone : inputPhone.trim());
     const birthdayToUse = (hasSavedProfile ? profile.birthday : inputBirthday.trim()) || "";
 
     if (!selectedService) {
@@ -613,6 +650,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                     id="customer-name"
                     required
                     type="text"
+                    maxLength={80}
                     value={inputName}
                     onChange={(e) => setInputName(e.target.value)}
                     placeholder="مثال: علی رضایی"

@@ -16,7 +16,7 @@ import {
   saveCustomerProfile,
   type CustomerProfile,
 } from "@/lib/customerCache";
-import { normalizeDigits } from "@/lib/booking";
+import { normalizeDigits, cleanIranPhone } from "@/lib/booking";
 import { registerCustomer } from "./actions";
 import { parseBirthday } from "@/lib/birthday";
 import BirthdayPicker from "./BirthdayPicker";
@@ -53,7 +53,7 @@ function ModalContent({
 
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPhone = normalizeDigits(phoneInput);
+    const cleanPhone = cleanIranPhone(phoneInput);
     if (!/^09\d{9}$/.test(cleanPhone)) {
       setErrorMsg("لطفاً شماره موبایل ۱۱ رقمی معتبر (مثل ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید.");
       return;
@@ -74,7 +74,7 @@ function ModalContent({
   };
 
   const handleCompleteSubscription = () => {
-    const cleanPhone = normalizeDigits(phoneInput);
+    const cleanPhone = cleanIranPhone(phoneInput);
     const cleanName = nameInput.trim();
     const cleanBirthday = profile.birthday || normalizeDigits(birthdayInput.trim());
 
@@ -84,7 +84,11 @@ function ModalContent({
       formData.set("name", cleanName);
       formData.set("birthday", cleanBirthday);
 
-      await registerCustomer(formData);
+      const res = await registerCustomer(formData);
+      if (!res?.success) {
+        setErrorMsg(res?.error || "خطا در ثبت اطلاعات.");
+        return;
+      }
 
       const updated: CustomerProfile = {
         phone: cleanPhone,

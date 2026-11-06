@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import BrandLogo from "../BrandLogo";
 import {
@@ -54,16 +54,20 @@ export default function CustomerPortalClient({
   shopAddress?: string;
   shopMapUrl?: string;
 }) {
-  const [phone, setPhone] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return getSavedCustomerProfile().phone || "";
-  });
+  const [phone, setPhone] = useState("");
   const [inputPhone, setInputPhone] = useState("");
   const [data, setData] = useState<CustomerPortalData | null>(null);
-  const [isLoading, setIsLoading] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(getSavedCustomerProfile().phone);
-  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = getSavedCustomerProfile();
+    if (saved.phone) {
+      setPhone(saved.phone);
+      setIsLoading(true);
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">("upcoming");
   const [cancellingAppt, setCancellingAppt] = useState<CustomerPortalAppointment | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -261,7 +265,7 @@ export default function CustomerPortalClient({
         )}
 
         {/* View 1: If Phone is NOT provided yet */}
-        {!phone ? (
+        {!isMounted || !phone ? (
           <div className="mx-auto max-w-md mt-10 text-center">
             <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.03] mb-5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
               <User className="h-8 w-8 text-neutral-300" />

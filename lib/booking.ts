@@ -180,6 +180,18 @@ export function normalizeDigits(value: string): string {
 }
 
 /**
+ * Normalizes an Iranian phone number to standard 11-digit format starting with '09'.
+ * Handles +98, 0098, 98, or 10-digit 9... formats.
+ */
+export function cleanIranPhone(raw: string): string {
+  const digits = normalizeDigits(raw).replace(/\D/g, "");
+  if (digits.startsWith("0098")) return "0" + digits.slice(4);
+  if (digits.startsWith("98")) return "0" + digits.slice(2);
+  if (digits.length === 10 && digits.startsWith("9")) return "0" + digits;
+  return digits;
+}
+
+/**
  * Computes available slots for each hour window of the working day.
  * - Haircut services: only on-the-hour slots (09:00, 10:00, etc.), max 1 per hour.
  * - Other services: sequential slots (:40, :45, :50) with max 3 per hour.

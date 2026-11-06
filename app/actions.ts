@@ -9,7 +9,8 @@ import {
   SERVICES,
   TIME_SLOTS,
   iranToday,
-  normalizeDigits,
+  cleanIranPhone,
+  toPersianDigits,
   isHaircutService,
   OTHER_SLOT_MINUTES,
   getSlotsForService,
@@ -32,9 +33,9 @@ import { dispatchUpcomingReminders, checkRemindersOpportunistically } from "@/li
 export async function bookAppointment(formData: FormData) {
   const service = String(formData.get("service") ?? "");
   const date = String(formData.get("date") ?? "");
-  const time = String(formData.get("time") ?? "");
+  const time = toPersianDigits(String(formData.get("time") ?? "").trim());
   const name = String(formData.get("name") ?? "").trim();
-  const phone = normalizeDigits(String(formData.get("phone") ?? ""));
+  const phone = cleanIranPhone(String(formData.get("phone") ?? ""));
   const rawBirthday = String(formData.get("birthday") ?? "").trim();
   const birthday = parseBirthday(rawBirthday)?.normalized ?? null;
 
@@ -405,7 +406,7 @@ export async function deleteEvent(formData: FormData) {
 /** Register or update customer from onboarding modal */
 export async function registerCustomer(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const phone = normalizeDigits(String(formData.get("phone") ?? ""));
+  const phone = cleanIranPhone(String(formData.get("phone") ?? ""));
   const rawBirthday = String(formData.get("birthday") ?? "").trim();
   const birthday = parseBirthday(rawBirthday)?.normalized ?? null;
 
@@ -519,14 +520,6 @@ export async function deleteUnavailableTime(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/");
   redirect("/admin?tab=schedule&saved=1");
-}
-
-function cleanIranPhone(raw: string): string {
-  const digits = normalizeDigits(raw).replace(/\D/g, "");
-  if (digits.startsWith("0098")) return "0" + digits.slice(4);
-  if (digits.startsWith("98")) return "0" + digits.slice(2);
-  if (digits.length === 10 && digits.startsWith("9")) return "0" + digits;
-  return digits;
 }
 
 export interface CustomerPortalAppointment {
