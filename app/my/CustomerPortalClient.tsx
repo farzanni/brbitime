@@ -35,7 +35,7 @@ import {
   getSavedCustomerProfile,
   saveCustomerProfile,
 } from "@/lib/customerCache";
-import { SERVICES, formatPersianDate } from "@/lib/booking";
+import { SERVICES, formatPersianDate, normalizeDigits, iranToday } from "@/lib/booking";
 import { trackClientEvent } from "@/lib/analytics-client";
 
 function getServiceName(serviceId: string): string {
@@ -157,7 +157,7 @@ export default function CustomerPortalClient({
 
   function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const cleaned = inputPhone.trim();
+    const cleaned = normalizeDigits(inputPhone).trim();
     if (!/^0?9\d{9}$/.test(cleaned)) {
       setActionMessage({ type: "error", text: "لطفاً یک شماره موبایل معتبر ۱۱ رقمی (مثال: ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید." });
       return;
@@ -190,7 +190,7 @@ export default function CustomerPortalClient({
     });
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = iranToday();
 
   const upcomingAppointments = (data?.appointments || []).filter(
     (a) => a.status === "booked" && a.appointment_date >= todayStr

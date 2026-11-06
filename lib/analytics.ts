@@ -470,9 +470,11 @@ export async function getBusinessAnalytics(
 
       // Day of week distribution
       try {
-        const d = new Date(appt.appointment_date);
-        if (!isNaN(d.getTime())) {
-          const dayIdx = d.getDay();
+        const dateStr = String(appt.appointment_date).split("T")[0];
+        const [y, m, d] = dateStr.split("-").map(Number);
+        if (y && m && d) {
+          const dateUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+          const dayIdx = dateUtc.getUTCDay();
           dayOfWeekCounts.set(dayIdx, (dayOfWeekCounts.get(dayIdx) ?? 0) + 1);
         }
       } catch {

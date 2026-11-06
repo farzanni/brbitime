@@ -41,6 +41,7 @@ async function sendKavenegarSms(apiKey: string, receptor: string, message: strin
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
+      signal: AbortSignal.timeout(8000),
     });
     const json = (await res.json().catch(() => null)) as {
       return?: { status: number; message: string };
@@ -91,7 +92,9 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
           token3: payload.time,
           template: template,
         });
-        await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`);
+        await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`, {
+          signal: AbortSignal.timeout(8000),
+        });
       } else {
         await sendKavenegarSms(apiKey, payload.customerPhone, customerMessage, sender);
       }
@@ -123,6 +126,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
               time: payload.time,
             },
           }),
+          signal: AbortSignal.timeout(8000),
         });
       } else {
         await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
@@ -136,6 +140,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
             sender: originPhone,
             message: customerMessage,
           }),
+          signal: AbortSignal.timeout(8000),
         });
       }
 
@@ -152,6 +157,7 @@ export async function sendBookingSms(payload: BookingSmsPayload): Promise<void> 
             sender: originPhone,
             message: barberMessage,
           }),
+          signal: AbortSignal.timeout(8000),
         });
       }
     } else {
@@ -197,7 +203,9 @@ export async function sendAppointmentReminderSms(payload: ReminderSmsPayload): P
           token3: shopName.replace(/\s+/g, "."),
           template: template,
         });
-        await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`);
+        await fetch(`https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`, {
+          signal: AbortSignal.timeout(8000),
+        });
       } else {
         await sendKavenegarSms(apiKey, payload.customerPhone, customerMessage, sender);
       }
@@ -224,6 +232,7 @@ export async function sendAppointmentReminderSms(payload: ReminderSmsPayload): P
               time: payload.time,
             },
           }),
+          signal: AbortSignal.timeout(8000),
         });
       } else {
         await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
@@ -237,6 +246,7 @@ export async function sendAppointmentReminderSms(payload: ReminderSmsPayload): P
             sender: originPhone,
             message: customerMessage,
           }),
+          signal: AbortSignal.timeout(8000),
         });
       }
       return true;
@@ -247,6 +257,60 @@ export async function sendAppointmentReminderSms(payload: ReminderSmsPayload): P
   } catch (err) {
     console.error(`[SMS Reminder Error] Failed to send reminder to ${payload.customerPhone}:`, err);
     return false;
+  }
+}
+
+export interface CancellationSmsPayload {
+  customerName: string;
+  customerPhone: string;
+  serviceName: string;
+  date: string;
+  time: string;
+}
+
+/**
+ * Sends a cancellation alert SMS to barber phones.
+ * Never throws — SMS failure must not fail a cancellation flow.
+ */
+export async function sendCancellationSms(payload: CancellationSmsPayload): Promise<void> {
+  const provider = getProvider();
+  const barberPhones = getBarberPhones();
+  const formattedDate = formatPersianDate(payload.date);
+  const sender = process.env.SMS_SENDER || "2000660110";
+
+  const message = `⚠️ لغو نوبت: ${payload.customerName} برای ${payload.serviceName} در تاریخ ${formattedDate} ساعت ${payload.time} نوبت خود را لغو کرد.\n📞 تماس: ${payload.customerPhone}`;
+
+  try {
+    if (provider === "kavenegar") {
+      const apiKey = process.env.KAVENEGAR_API_KEY ?? "";
+      for (const phone of barberPhones) {
+        await sendKavenegarSms(apiKey, phone, message, sender);
+      }
+    } else if (provider === "farazsms") {
+      const apiKey = process.env.FARAZSMS_API_KEY || process.env.IPPANEL_API_KEY || "";
+      const originPhone = sender || "+983000505";
+      for (const barberPhone of barberPhones) {
+        await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `AccessKey ${apiKey}`,
+          },
+          body: JSON.stringify({
+            recipient: [barberPhone],
+            sender: originPhone,
+            message,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+      }
+    } else {
+      for (const phone of barberPhones) {
+        console.log(`[SMS MOCK] Barber Cancel Alert (${phone}): ${message}`);
+      }
+    }
+  } catch (err) {
+    console.error("Cancellation SMS notification failed:", err);
   }
 }
 

@@ -206,7 +206,7 @@ export async function dispatchUpcomingReminders(referenceDate: Date = new Date()
 
       if (claimed && claimed.length > 0) {
         const serviceName = getServiceName(appt.service);
-        await sendAppointmentReminderSms({
+        const smsSent = await sendAppointmentReminderSms({
           customerName: appt.customer_name,
           customerPhone: appt.phone,
           serviceName,
@@ -214,17 +214,19 @@ export async function dispatchUpcomingReminders(referenceDate: Date = new Date()
           time: appt.appointment_time,
         });
 
-        sentCount++;
-        details.push({
-          id: appt.id,
-          customerName: appt.customer_name,
-          phone: appt.phone,
-          date: appt.appointment_date,
-          time: appt.appointment_time,
-          service: serviceName,
-          action: "sent",
-          minutesUntil: evaluation.minutesUntil,
-        });
+        if (smsSent) {
+          sentCount++;
+          details.push({
+            id: appt.id,
+            customerName: appt.customer_name,
+            phone: appt.phone,
+            date: appt.appointment_date,
+            time: appt.appointment_time,
+            service: serviceName,
+            action: "sent",
+            minutesUntil: evaluation.minutesUntil,
+          });
+        }
       }
     }
   }

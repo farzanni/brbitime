@@ -1,21 +1,22 @@
 # 💈 brbitime — رزرو آنلاین آرایشگاه
 
-**🔴 Live:** [brbitime.vercel.app](https://brbitime.vercel.app)
+**🔴 Live:** [muucut.ir](https://muucut.ir)
 
 ![brbitime booking flow](docs/img/screenshot-hero.png)
 
 Online appointment booking platform for salons and barbershops. Customers pick a service,
-a day, and a time slot; the owner gets an instant
-Telegram notification and manages bookings from a password-protected panel.
+a day, and a time slot; the customer and owner receive instant SMS notifications and the barber manages bookings from a password-protected panel.
 
 Built with Next.js (App Router), React 19, Tailwind CSS 4, Neon serverless
-Postgres, and the Telegram Bot API. Fully RTL / Persian-first.
+Postgres, and Kavenegar/FarazSMS API. Fully RTL / Persian-first.
 
 ## Features
 
 - Mobile-first RTL booking flow: service → Persian-calendar day → time slot → contact info
 - Live availability: booked slots are disabled and double-bookings are rejected at the DB level (`UNIQUE` constraint)
-- Instant Telegram alert to the owner on every new booking (non-blocking — booking succeeds even if the alert fails)
+- Instant SMS alert to customer & barber on every new booking (non-blocking)
+- Automated 30-minute appointment reminder SMS via background Vercel cron
+- Instant SMS alert to barber on customer cancellation
 - Owner panel at `/admin` (password login, HMAC-signed session cookie): upcoming appointments, cancel, logout
 - Business & Funnel Analytics at `/admin?tab=analytics`: estimated revenue, conversion funnel, service breakdown, peak days & hours, marketing attribution (Instagram/SMS/Direct), and live activity stream
 - Confirmation page with the customer's own booking details
@@ -27,10 +28,10 @@ Postgres, and the Telegram Bot API. Fully RTL / Persian-first.
 | `DATABASE_URL` | ✅ | Neon Postgres connection string |
 | `ADMIN_PASSWORD` | ✅ | Owner panel password |
 | `ADMIN_SESSION_SECRET` | ✅ | Any long random string (signs the session cookie) |
-| `TELEGRAM_BOT_TOKEN` | optional | Bot token for booking alerts |
-| `TELEGRAM_CHAT_ID` | optional | Chat that receives booking alerts |
-| `TELEGRAM_TARGETS` | optional | Comma-separated `BOT_TOKEN:CHAT_ID` pairs — every target gets pinged (owner + operator). Takes priority over the single pair above. |
-| `NEXT_PUBLIC_APP_URL` | optional | Public URL, used for the admin link inside alerts |
+| `CRON_SECRET` | optional | Bearer secret for `/api/cron/reminders` |
+| `BARBER_PHONE` | optional | Barber phone number(s) receiving booking/cancel SMS |
+| `SMS_PROVIDER` | optional | `kavenegar` or `farazsms` |
+| `NEXT_PUBLIC_APP_URL` | optional | Public canonical URL (`https://muucut.ir`) |
 
 ## Database schema
 

@@ -121,7 +121,7 @@ export default async function AdminPage({
 
   const sql = getSql();
   const [appointments, customers, shop, unavailableTimes] = await Promise.all([
-    (sql`SELECT id, service, appointment_date, appointment_time, customer_name, phone, customer_birthday, reminder_sent_at FROM appointments WHERE status = 'booked' AND appointment_date >= ${iranToday()} ORDER BY appointment_date, appointment_time` as unknown as Promise<Appointment[]>),
+    (sql`SELECT id, service, appointment_date::text AS appointment_date, appointment_time, customer_name, phone, customer_birthday, reminder_sent_at FROM appointments WHERE status = 'booked' AND appointment_date >= ${iranToday()} ORDER BY appointment_date, appointment_time` as unknown as Promise<Appointment[]>),
     (sql`SELECT id, phone, name, birthday, notes, total_visits, last_visit_at, created_at FROM customers ORDER BY last_visit_at DESC NULLS LAST, id DESC` as unknown as Promise<Customer[]>),
     getShopConfig(),
     getUnavailableTimes(iranToday()),

@@ -31,7 +31,7 @@ export default async function SuccessPage({
     const rows = (await sql`
       SELECT
         service,
-        appointment_date,
+        appointment_date::text AS appointment_date,
         appointment_time,
         customer_name,
         status

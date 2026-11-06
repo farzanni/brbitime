@@ -245,17 +245,33 @@ export async function cancelMyBooking(formData: FormData) {
     redirect("/");
   }
 
-  await getSql()`
+  const sql = getSql();
+  const rows = await sql`
     UPDATE appointments
     SET status = 'cancelled'
     WHERE public_id = ${publicId}
       AND status = 'booked'
+    RETURNING service, appointment_date::text AS appointment_date, appointment_time, customer_name, phone
   `;
 
-  await recordAnalyticsEvent({
-    eventName: "booking_cancelled",
-    eventData: { publicId, cancelledBy: "customer" },
-  });
+  if (rows && rows.length > 0) {
+    const appt = rows[0];
+    after(async () => {
+      await Promise.allSettled([
+        recordAnalyticsEvent({
+          eventName: "booking_cancelled",
+          eventData: { publicId, cancelledBy: "customer" },
+        }),
+        notifyCancellation({
+          service: String(appt.service),
+          date: String(appt.appointment_date),
+          time: String(appt.appointment_time),
+          name: String(appt.customer_name),
+          phone: String(appt.phone),
+        }),
+      ]);
+    });
+  }
 
   revalidatePath("/admin");
   redirect(`/success?id=${publicId}&cancelled=1`);
@@ -632,7 +648,7 @@ export async function cancelCustomerAppointment(publicId: string, rawPhone: stri
   revalidatePath("/admin");
   revalidatePath("/my");
 
-  // Alert the barber via Telegram in background
+  // Alert the barber via SMS in background
   after(async () => {
     await notifyCancellation({
       service: String(appt.service),
