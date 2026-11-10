@@ -50,7 +50,10 @@ export const DEFAULT_SERVICES: ServiceItem[] = [
   { id: "beard", name: "اصلاح ریش", price: "۲۵۰ تا ۳۵۰ هزار تومان", duration: "۲۰ دقیقه" },
   { id: "vip-package", name: "پکیج اصلاح و پاکسازی VIP", price: "۱٬۴۰۰ تا ۱٬۸۰۰ هزار تومان", duration: "۵۵ دقیقه" },
   { id: "vip", name: "اصلاح تخصصی VIP", price: "۵۵۰ تا ۷۵۰ هزار تومان", duration: "۵۵ دقیقه" },
+  { id: "lineup", name: "خط گیری سر و ریش", price: "۱۲۰٬۰۰۰ تومان" },
+  { id: "styling", name: "سشوار و استایل", price: "۱۰۰٬۰۰۰ تومان" },
   { id: "cleansing", name: "پاکسازی", price: "۹۵۰ تا ۱٬۲۰۰ هزار تومان", duration: "۴۵ دقیقه" },
+  { id: "wax", name: "وکس", price: "۱۵۰٬۰۰۰ تومان" },
 ];
 
 export const DEFAULT_PRODUCTS: ProductItem[] = [
