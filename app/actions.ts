@@ -15,6 +15,7 @@ import {
   OTHER_SLOT_MINUTES,
   getSlotsForService,
   isSlotPast,
+  formatPersianDate,
 } from "@/lib/booking";
 import {
   adminPasswordMatches,
@@ -28,6 +29,8 @@ import { parseBirthday } from "@/lib/birthday";
 import { recordAnalyticsEvent } from "@/lib/analytics";
 import { addUnavailableRecords, deleteUnavailableRecord } from "@/lib/unavailable";
 import { dispatchUpcomingReminders, checkRemindersOpportunistically } from "@/lib/reminders";
+import { sendDirectSms, getBarberPhones } from "@/lib/sms";
+import { sendBroadcastCampaign, interpolateSmsTemplate } from "@/lib/sms-broadcast";
 
 
 export async function bookAppointment(formData: FormData) {
@@ -691,5 +694,79 @@ export async function triggerManualReminders() {
   revalidatePath("/admin");
   redirect(`/admin?tab=appointments&reminded=${result.sentCount}`);
 }
+
+/** Admin: Send Broadcast SMS to filtered customers */
+export async function sendAdminBroadcastSms(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const message = String(formData.get("message") ?? "").trim();
+  const filterName = String(formData.get("filterName") ?? "فیلتر سفارشی").trim();
+  const recipientsRaw = String(formData.get("recipients") ?? "[]");
+
+  if (!message) {
+    redirect("/admin?tab=sms&error=empty-message");
+  }
+
+  let recipients: Array<{ phone: string; name: string }> = [];
+  try {
+    recipients = JSON.parse(recipientsRaw);
+  } catch {
+    redirect("/admin?tab=sms&error=invalid-recipients");
+  }
+
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    redirect("/admin?tab=sms&error=no-recipients");
+  }
+
+  const shop = await getShopConfig();
+  const result = await sendBroadcastCampaign({
+    recipients,
+    template: message,
+    filterName,
+    shopName: shop.name,
+    shopUrl: "muucut.ir",
+  });
+
+  revalidatePath("/admin");
+  redirect(`/admin?tab=sms&sent=${result.sent}&failed=${result.failed}`);
+}
+
+/** Admin: Send quick test SMS to barber's phone */
+export async function sendAdminTestSms(formData: FormData) {
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
+  const message = String(formData.get("message") ?? "").trim();
+  const rawTargetPhone = String(formData.get("phone") ?? "").trim();
+  const defaultBarberPhone = getBarberPhones()[0] || "09376802989";
+  const targetPhone = cleanIranPhone(rawTargetPhone || defaultBarberPhone);
+
+  if (!message) {
+    redirect("/admin?tab=sms&error=empty-message");
+  }
+
+  const shop = await getShopConfig();
+  const interpolated = interpolateSmsTemplate(
+    message,
+    { phone: targetPhone, name: "مدیر سالن (تست)" },
+    {
+      shopName: shop.name,
+      persianDate: formatPersianDate(iranToday()),
+      shopUrl: "muucut.ir",
+    }
+  );
+
+  const res = await sendDirectSms(targetPhone, interpolated);
+  revalidatePath("/admin");
+  if (res.ok) {
+    redirect(`/admin?tab=sms&test_sent=1&target=${encodeURIComponent(targetPhone)}`);
+  } else {
+    redirect(`/admin?tab=sms&test_error=${encodeURIComponent(res.error || "خطای ارسال")}`);
+  }
+}
+
 
 

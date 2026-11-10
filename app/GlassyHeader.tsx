@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import BrandLogo from "./BrandLogo";
-import { Phone, CalendarCheck, User } from "lucide-react";
+import { Phone, CalendarCheck, User, Camera } from "lucide-react";
 import { trackClientEvent } from "@/lib/analytics-client";
 
 export default function GlassyHeader({
@@ -49,6 +49,14 @@ export default function GlassyHeader({
 
         {/* Left side: Quick actions */}
         <div className="flex items-center gap-2">
+          <Link
+            href="/gallery"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-neutral-300 hover:border-white/30 hover:text-white transition"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">گالری مدل مو</span>
+          </Link>
+
           <Link
             href="/my"
             className="flex h-9 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-neutral-300 hover:border-white/30 hover:text-white transition"

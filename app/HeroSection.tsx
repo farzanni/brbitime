@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import BrandLogo from "./BrandLogo";
-import { MapPin, Scissors, User, ShoppingBag, Tag } from "lucide-react";
+import { MapPin, Scissors, User, ShoppingBag, Tag, Camera } from "lucide-react";
 
 export default function HeroSection({
   name,
@@ -47,7 +47,7 @@ export default function HeroSection({
           {tagline || "پیرایش و استایل موی آقایان"}
         </p>
 
-        {/* Clean Actions: Booking, My appointments, Products, Discounts */}
+        {/* Clean Actions: Booking, Haircuts Gallery, Discounts, Products, My appointments */}
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
           <a
             href="#booking"
@@ -58,12 +58,20 @@ export default function HeroSection({
           </a>
 
           <Link
-            href="/my"
+            href="/gallery"
+            className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 sm:px-5 sm:py-3 text-sm font-medium text-white hover:bg-white/20 hover:border-white/35 transition backdrop-blur-md active:scale-95 shadow-sm"
+          >
+            <Camera className="h-4 w-4 text-neutral-300" />
+            <span>گالری مدل مو</span>
+          </Link>
+
+          <a
+            href="#discounts"
             className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 sm:px-5 sm:py-3 text-sm font-medium text-white hover:bg-white/15 transition backdrop-blur-md active:scale-95"
           >
-            <User className="h-4 w-4" />
-            <span>نوبت‌های من</span>
-          </Link>
+            <Tag className="h-4 w-4" />
+            <span>تخفیف‌ها</span>
+          </a>
 
           <a
             href="#products"
@@ -73,13 +81,13 @@ export default function HeroSection({
             <span>محصولات</span>
           </a>
 
-          <a
-            href="#discounts"
+          <Link
+            href="/my"
             className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 sm:px-5 sm:py-3 text-sm font-medium text-white hover:bg-white/15 transition backdrop-blur-md active:scale-95"
           >
-            <Tag className="h-4 w-4" />
-            <span>تخفیف‌ها</span>
-          </a>
+            <User className="h-4 w-4" />
+            <span>نوبت‌های من</span>
+          </Link>
         </div>
 
         {/* Location */}

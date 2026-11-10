@@ -53,12 +53,71 @@ async function sendKavenegarSms(apiKey: string, receptor: string, message: strin
         `[Kavenegar SMS Error] Status ${json?.return?.status ?? res.status} for ${receptor}:`,
         json?.return?.message ?? "Unknown error"
       );
+      return { ok: false, error: json?.return?.message ?? `HTTP ${res.status}` };
     } else {
       console.log(`[Kavenegar SMS Success] Sent to ${receptor} (ID: ${json?.entries?.[0]?.messageid})`);
+      return { ok: true, messageId: json?.entries?.[0]?.messageid };
     }
-    return json;
   } catch (error) {
     console.error(`[Kavenegar SMS Network Error] Failed to send to ${receptor}:`, error);
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function sendFarazSms(apiKey: string, receptor: string, message: string, sender: string) {
+  try {
+    const res = await fetch("https://edge.ippanel.com/api/v1/sms/send/webservice/single", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `AccessKey ${apiKey}`,
+      },
+      body: JSON.stringify({
+        recipient: [receptor],
+        sender: sender,
+        message: message,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const json = (await res.json().catch(() => null)) as {
+      status?: string | number;
+      message?: string;
+      data?: { message_id?: number | string };
+    } | null;
+
+    if (!res.ok) {
+      console.error(`[FarazSMS Error] Status ${res.status} for ${receptor}:`, json?.message ?? "Unknown error");
+      return { ok: false, error: json?.message ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, messageId: json?.data?.message_id };
+  } catch (error) {
+    console.error(`[FarazSMS Network Error] Failed to send to ${receptor}:`, error);
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Sends a single direct SMS using configured provider (Kavenegar, FarazSMS, or Mock).
+ * Never throws — returns status object.
+ */
+export async function sendDirectSms(
+  phone: string,
+  message: string
+): Promise<{ ok: boolean; error?: string; messageId?: number | string }> {
+  const provider = getProvider();
+  const sender = process.env.SMS_SENDER || "2000660110";
+
+  if (provider === "kavenegar") {
+    const apiKey = process.env.KAVENEGAR_API_KEY ?? "";
+    const res = await sendKavenegarSms(apiKey, phone, message, sender);
+    return res ?? { ok: false, error: "No response from Kavenegar" };
+  } else if (provider === "farazsms") {
+    const apiKey = process.env.FARAZSMS_API_KEY || process.env.IPPANEL_API_KEY || "";
+    const originPhone = sender || "+983000505";
+    return await sendFarazSms(apiKey, phone, message, originPhone);
+  } else {
+    console.log(`[SMS MOCK DIRECT] Receptor: ${phone} | Content: ${message}`);
+    return { ok: true, messageId: `mock-${Date.now()}` };
   }
 }
 

@@ -3,6 +3,8 @@ import { SERVICES, iranToday, formatPersianDate } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
 import { getShopConfig } from "@/lib/shop";
 import { checkBirthdayStatus } from "@/lib/birthday";
+import { getBarberPhones } from "@/lib/sms";
+import { getCustomersForSms, getSmsBroadcasts } from "@/lib/sms-broadcast";
 import BrandLogo from "../BrandLogo";
 import {
   cancelAppointment,
@@ -38,9 +40,11 @@ import {
   Ban,
   AlertCircle,
   Bell,
+  MessageSquare,
 } from "lucide-react";
 import AnalyticsView from "./AnalyticsView";
 import AdminUnavailableForm from "./AdminUnavailableForm";
+import AdminSmsSection from "./AdminSmsSection";
 import { getBusinessAnalytics, type TimeRange } from "@/lib/analytics";
 import { getUnavailableTimes } from "@/lib/unavailable";
 
@@ -71,10 +75,34 @@ type Customer = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; tab?: string; saved?: string; range?: string; reminded?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    tab?: string;
+    saved?: string;
+    range?: string;
+    reminded?: string;
+    phone?: string;
+    sent?: string;
+    failed?: string;
+    test_sent?: string;
+    test_target?: string;
+    test_error?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const { error, tab = "appointments", saved, range = "30d", reminded } = params;
+  const {
+    error,
+    tab = "appointments",
+    saved,
+    range = "30d",
+    reminded,
+    phone,
+    sent,
+    failed,
+    test_sent,
+    test_target,
+    test_error,
+  } = params;
 
   if (!(await isAdmin())) {
     return (
@@ -120,11 +148,13 @@ export default async function AdminPage({
   }
 
   const sql = getSql();
-  const [appointments, customers, shop, unavailableTimes] = await Promise.all([
+  const [appointments, customers, shop, unavailableTimes, smsCustomers, smsBroadcasts] = await Promise.all([
     (sql`SELECT id, service, appointment_date::text AS appointment_date, appointment_time, customer_name, phone, customer_birthday, reminder_sent_at FROM appointments WHERE status = 'booked' AND appointment_date >= ${iranToday()} ORDER BY appointment_date, appointment_time` as unknown as Promise<Appointment[]>),
     (sql`SELECT id, phone, name, birthday, notes, total_visits, last_visit_at, created_at FROM customers ORDER BY last_visit_at DESC NULLS LAST, id DESC` as unknown as Promise<Customer[]>),
     getShopConfig(),
     getUnavailableTimes(iranToday()),
+    tab === "sms" ? getCustomersForSms() : Promise.resolve([]),
+    tab === "sms" ? getSmsBroadcasts() : Promise.resolve([]),
   ]);
 
   const validRange = (["today", "7d", "30d", "all"].includes(range) ? range : "30d") as TimeRange;
@@ -189,6 +219,18 @@ export default async function AdminPage({
           >
             <Users className="h-4 w-4" />
             بانک مشتریان ({customers.length})
+          </a>
+
+          <a
+            href="/admin?tab=sms"
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              tab === "sms"
+                ? "bg-amber-400 text-neutral-950"
+                : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+            }`}
+          >
+            <MessageSquare className="h-4 w-4" />
+            ارسال پیامک ({customers.length})
           </a>
 
           <a
@@ -492,6 +534,20 @@ export default async function AdminPage({
                         </button>
                       </div>
                     </form>
+
+                    {/* Quick SMS action */}
+                    <div className="flex items-center justify-between border-t border-neutral-800/80 pt-2.5">
+                      <span className="text-[10px] text-neutral-500 font-mono">
+                        عضویت: {new Date(c.created_at).toLocaleDateString("fa-IR")}
+                      </span>
+                      <a
+                        href={`/admin?tab=sms&phone=${c.phone}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        <span>ارسال پیامک اختصاصی</span>
+                      </a>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -843,7 +899,24 @@ export default async function AdminPage({
           </div>
         )}
 
-        {/* TAB 5: Analytics */}
+        {/* TAB 5: SMS Marketing & Broadcast */}
+        {tab === "sms" && (
+          <AdminSmsSection
+            customers={smsCustomers}
+            broadcasts={smsBroadcasts}
+            defaultBarberPhone={getBarberPhones()[0] || "09376802989"}
+            shopName={shop.name}
+            initialPreselectedPhone={phone}
+            error={error}
+            sentCount={sent}
+            failedCount={failed}
+            testSent={test_sent}
+            testTarget={test_target}
+            testError={test_error}
+          />
+        )}
+
+        {/* TAB 6: Analytics */}
         {tab === "analytics" && analyticsData && (
           <AnalyticsView data={analyticsData} currentRange={validRange} />
         )}
