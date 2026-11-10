@@ -364,3 +364,55 @@ export function formatPersianDate(dateInput: string | Date | null | undefined): 
   }
 }
 
+export interface RollingDayInfo {
+  isoDate: string; // YYYY-MM-DD
+  weekday: string; // سه‌شنبه
+  dayMonth: string; // ۱۹ آبان
+  fullPersian: string; // سه‌شنبه ۱۹ آبان
+  isToday: boolean;
+  isTomorrow: boolean;
+}
+
+/**
+ * Returns a 7-day rolling window of dates starting from baseDate (defaults to Iran today).
+ * offsetWeeks shifts the window forward by 7 days per increment (0 = today to +6, 1 = +7 to +13, etc.).
+ */
+export function getRollingDays(offsetWeeks = 0, baseDateStr?: string): RollingDayInfo[] {
+  const base = baseDateStr || iranToday();
+  const [y, m, d] = base.split("-").map(Number);
+  const days: RollingDayInfo[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const dayOffset = offsetWeeks * 7 + i;
+    // Noon UTC avoids daylight saving or timezone boundary drifts
+    const dateObj = new Date(Date.UTC(y, m - 1, d + dayOffset, 12, 0, 0));
+    const isoDate = dateObj.toISOString().split("T")[0];
+    const weekday = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "Asia/Tehran",
+      weekday: "long",
+    }).format(dateObj);
+    const dayMonth = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "Asia/Tehran",
+      day: "numeric",
+      month: "short",
+    }).format(dateObj);
+    const fullPersian = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "Asia/Tehran",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(dateObj);
+
+    days.push({
+      isoDate,
+      weekday,
+      dayMonth,
+      fullPersian,
+      isToday: dayOffset === 0,
+      isTomorrow: dayOffset === 1,
+    });
+  }
+
+  return days;
+}
+

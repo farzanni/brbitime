@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { DayPicker, faIR } from "@daypicker/persian";
-import "@daypicker/react/style.css";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { bookAppointment } from "./actions";
 import {
   SERVICES,
   cleanIranPhone,
+  normalizeDigits,
   isHaircutService,
   getSlotsForService,
   getIranDateTime,
   formatPersianDate,
+  iranToday,
+  getRollingDays,
+  type RollingDayInfo,
   type BookedAppointmentInfo,
   type UnavailableSlotInfo,
   type SlotOption,
@@ -23,6 +25,7 @@ import {
 import {
   Calendar,
   Scissors,
+  Clock,
   User,
   Gift,
   CheckCircle2,
@@ -31,92 +34,21 @@ import {
   ChevronUp,
   ChevronRight,
   ChevronLeft,
+  ArrowLeft,
+  ArrowRight,
   Ban,
   Info,
+  Check,
+  Edit2,
 } from "lucide-react";
 import { checkBirthdayStatus } from "@/lib/birthday";
 import CustomerOnboardingModal from "./CustomerOnboardingModal";
 import BirthdayPicker from "./BirthdayPicker";
 import { trackClientEvent } from "@/lib/analytics-client";
 
-function DayPickerChevron({
-  orientation,
-  className,
-}: {
-  orientation?: "left" | "right" | "up" | "down";
-  className?: string;
-}) {
-  if (orientation === "right") {
-    return <ChevronRight className={`h-4 w-4 shrink-0 ${className ?? ""}`} />;
-  }
-  return <ChevronLeft className={`h-4 w-4 shrink-0 ${className ?? ""}`} />;
-}
+type Step = 1 | 2 | 3 | 4;
 
 export default function BookingForm({ minDate }: { minDate: string }) {
-  const [selectedService, setSelectedService] = useState("haircut");
-  const [date, setDate] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedTime, setSelectedTime] = useState("");
-  const [availability, setAvailability] = useState<{
-    date: string;
-    times: string[];
-    appointments: BookedAppointmentInfo[];
-    unavailable: UnavailableSlotInfo[];
-    isAllDayUnavailable: boolean;
-    allDayNote: string | null;
-  }>({
-    date: "",
-    times: [],
-    appointments: [],
-    unavailable: [],
-    isAllDayUnavailable: false,
-    allDayNote: null,
-  });
-  const availabilityCache = useRef<
-    Record<
-      string,
-      {
-        date: string;
-        times: string[];
-        appointments: BookedAppointmentInfo[];
-        unavailable: UnavailableSlotInfo[];
-        isAllDayUnavailable: boolean;
-        allDayNote: string | null;
-      }
-    >
-  >({});
-  const inFlightPrefetch = useRef<Record<string, Promise<unknown> | undefined>>({});
-  const [loading, setLoading] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
-  // Customer state
-  const isMounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  );
-  const [profile, setProfile] = useState<CustomerProfile>(() => getSavedCustomerProfile());
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Unregistered inline customer inputs
-  const [inputName, setInputName] = useState("");
-  const [inputPhone, setInputPhone] = useState("");
-  const [inputBirthday, setInputBirthday] = useState("");
-  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
-  const [formError, setFormError] = useState("");
-
-  const hasSavedProfile = isMounted && Boolean(profile.name && profile.phone);
-
-  const handleProfileLoaded = (updated: CustomerProfile) => {
-    setProfile(updated);
-  };
-
-  const handleServiceChange = (serviceId: string) => {
-    setSelectedService(serviceId);
-    setSelectedTime("");
-    trackClientEvent("service_select", { serviceId });
-  };
-
   // Live clock for recognizing past times in Iran timezone
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -134,29 +66,87 @@ export default function BookingForm({ minDate }: { minDate: string }) {
   const iranMinuteKey = `${iranNowRaw.date}_${iranNowRaw.hour}_${iranNowRaw.minute}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const iranNow = useMemo(() => iranNowRaw, [iranMinuteKey]);
-  const effectiveMinDate = minDate && minDate >= iranNow.date ? minDate : iranNow.date;
+  const effectiveMinDate = minDate && minDate >= iranNow.date ? minDate : iranNow.date || iranToday();
 
-  const slots: SlotOption[] = useMemo(() => {
-    const currentAppointments =
-      availability.date === date ? availability.appointments : [];
-    const currentUnavailable =
-      availability.date === date ? availability.unavailable : [];
-    return getSlotsForService(
-      selectedService,
-      currentAppointments,
-      currentUnavailable,
-      date,
-      iranNow
-    );
-  }, [selectedService, availability, date, iranNow]);
+  // Wizard Step: 1 = Date, 2 = Service, 3 = Time, 4 = Details
+  const [step, setStep] = useState<Step>(1);
 
-  const isHaircut = isHaircutService(selectedService);
-  const activeSelectedTime = slots.some(
-    (s) => s.time === selectedTime && !s.isBooked && !s.isPassed && !s.isUnavailable
-  )
-    ? selectedTime
-    : "";
+  // Step 1: Rolling 7-day selection
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [date, setDate] = useState(() => effectiveMinDate);
 
+  // Step 2: Service selection
+  const [selectedService, setSelectedService] = useState("haircut");
+
+  // Step 3: Time slot selection
+  const [selectedTime, setSelectedTime] = useState("");
+
+  // Customer state & Hydration guard
+  const [isMounted, setIsMounted] = useState(false);
+  const [profile, setProfile] = useState<CustomerProfile>({
+    name: "",
+    phone: "",
+    birthday: "",
+    isSubscribed: false,
+  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Guest inputs
+  const [inputName, setInputName] = useState("");
+  const [inputPhone, setInputPhone] = useState("");
+  const [inputBirthday, setInputBirthday] = useState("");
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = getSavedCustomerProfile();
+    if (saved.phone || saved.name) {
+      setProfile(saved);
+    }
+  }, []);
+
+  const hasSavedProfile = isMounted && Boolean(profile.name && profile.phone);
+
+  const handleProfileLoaded = (updated: CustomerProfile) => {
+    setProfile(updated);
+  };
+
+  // Availability cache & fetching
+  const [availability, setAvailability] = useState<{
+    date: string;
+    times: string[];
+    appointments: BookedAppointmentInfo[];
+    unavailable: UnavailableSlotInfo[];
+    isAllDayUnavailable: boolean;
+    allDayNote: string | null;
+  }>({
+    date: "",
+    times: [],
+    appointments: [],
+    unavailable: [],
+    isAllDayUnavailable: false,
+    allDayNote: null,
+  });
+
+  const availabilityCache = useRef<
+    Record<
+      string,
+      {
+        date: string;
+        times: string[];
+        appointments: BookedAppointmentInfo[];
+        unavailable: UnavailableSlotInfo[];
+        isAllDayUnavailable: boolean;
+        allDayNote: string | null;
+      }
+    >
+  >({});
+  const inFlightPrefetch = useRef<Record<string, Promise<unknown> | undefined>>({});
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  // Fetch availability when date changes
   useEffect(() => {
     if (!date) return;
 
@@ -168,7 +158,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     const controller = new AbortController();
 
     async function loadAvailability() {
-      setLoading(true);
+      setLoadingAvailability(true);
 
       try {
         const pendingPrefetch = inFlightPrefetch.current[date];
@@ -182,9 +172,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
 
         const response = await fetch(
           `/api/availability?date=${encodeURIComponent(date)}`,
-          {
-            signal: controller.signal,
-          },
+          { signal: controller.signal }
         );
 
         if (!response.ok) return;
@@ -203,7 +191,7 @@ export default function BookingForm({ minDate }: { minDate: string }) {
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
       } finally {
-        setLoading(false);
+        setLoadingAvailability(false);
       }
     }
 
@@ -212,39 +200,83 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     return () => controller.abort();
   }, [date]);
 
-  useEffect(() => {
-    if (
-      !effectiveMinDate ||
-      availabilityCache.current[effectiveMinDate] ||
-      Boolean(inFlightPrefetch.current[effectiveMinDate])
-    )
-      return;
+  // Rolling days for current weekOffset
+  const rollingDays: RollingDayInfo[] = useMemo(() => {
+    return getRollingDays(weekOffset, effectiveMinDate);
+  }, [weekOffset, effectiveMinDate]);
 
-    const fetchPromise = fetch(
-      `/api/availability?date=${encodeURIComponent(effectiveMinDate)}`
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data) return;
-        availabilityCache.current[effectiveMinDate] = {
-          date: effectiveMinDate,
-          times: data.bookedTimes || [],
-          appointments: data.appointments || [],
-          unavailable: data.unavailable || [],
-          isAllDayUnavailable: Boolean(data.isAllDayUnavailable),
-          allDayNote: data.allDayNote || null,
-        };
-      })
-      .catch(() => {})
-      .finally(() => {
-        delete inFlightPrefetch.current[effectiveMinDate];
-      });
+  // Selected day info
+  const selectedDayInfo = useMemo(() => {
+    return rollingDays.find((d) => d.isoDate === date) || null;
+  }, [rollingDays, date]);
 
-    inFlightPrefetch.current[effectiveMinDate] = fetchPromise;
-  }, [effectiveMinDate]);
+  // Selected service object
+  const currentServiceObj = useMemo(() => {
+    return SERVICES.find((s) => s.id === selectedService) || SERVICES[0];
+  }, [selectedService]);
+
+  // Available slots for selected service & date
+  const slots: SlotOption[] = useMemo(() => {
+    const currentAppointments =
+      availability.date === date ? availability.appointments : [];
+    const currentUnavailable =
+      availability.date === date ? availability.unavailable : [];
+    return getSlotsForService(
+      selectedService,
+      currentAppointments,
+      currentUnavailable,
+      date,
+      iranNow
+    );
+  }, [selectedService, availability, date, iranNow]);
+
+  const activeSelectedTime = slots.some(
+    (s) => s.time === selectedTime && !s.isBooked && !s.isPassed && !s.isUnavailable
+  )
+    ? selectedTime
+    : "";
+
+  // Group slots into Morning and Evening
+  const morningSlots = useMemo(() => {
+    return slots.filter((s) => {
+      const h = Number(normalizeDigits(s.hour));
+      return h >= 9 && h < 14;
+    });
+  }, [slots]);
+
+  const eveningSlots = useMemo(() => {
+    return slots.filter((s) => {
+      const h = Number(normalizeDigits(s.hour));
+      return h >= 14 && h <= 22;
+    });
+  }, [slots]);
 
   const activeBirthday = hasSavedProfile ? profile.birthday : inputBirthday;
   const birthdayStatus = activeBirthday ? checkBirthdayStatus(activeBirthday, date || undefined) : null;
+
+  const handleSelectDate = (isoDate: string) => {
+    setDate(isoDate);
+    setSelectedTime("");
+    setFormError("");
+    trackClientEvent("date_select", { date: isoDate });
+  };
+
+  const handleSelectService = (serviceId: string) => {
+    setSelectedService(serviceId);
+    setSelectedTime("");
+    setFormError("");
+    trackClientEvent("service_select", { serviceId });
+  };
+
+  const handleSelectTime = (time: string) => {
+    setSelectedTime(time);
+    setFormError("");
+    trackClientEvent("slot_select", {
+      service: selectedService,
+      date,
+      time,
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -254,16 +286,19 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     const phoneToUse = cleanIranPhone(hasSavedProfile ? profile.phone : inputPhone.trim());
     const birthdayToUse = (hasSavedProfile ? profile.birthday : inputBirthday.trim()) || "";
 
-    if (!selectedService) {
-      setFormError("لطفاً یک خدمت را انتخاب کنید.");
-      return;
-    }
     if (!date) {
       setFormError("لطفاً یک روز را انتخاب کنید.");
+      setStep(1);
+      return;
+    }
+    if (!selectedService) {
+      setFormError("لطفاً یک خدمت را انتخاب کنید.");
+      setStep(2);
       return;
     }
     if (!activeSelectedTime) {
       setFormError("لطفاً ساعت نوبت را انتخاب کنید.");
+      setStep(3);
       return;
     }
     if (nameToUse.length < 2) {
@@ -304,6 +339,13 @@ export default function BookingForm({ minDate }: { minDate: string }) {
     });
   };
 
+  const stepsMeta = [
+    { num: 1, label: "انتخاب روز", icon: Calendar },
+    { num: 2, label: "انتخاب خدمت", icon: Scissors },
+    { num: 3, label: "انتخاب ساعت", icon: Clock },
+    { num: 4, label: "مشخصات و ثبت", icon: User },
+  ];
+
   return (
     <>
       <CustomerOnboardingModal
@@ -314,241 +356,381 @@ export default function BookingForm({ minDate }: { minDate: string }) {
 
       <form
         onSubmit={handleSubmit}
-        className="rounded-3xl border border-white/10 bg-[#0c0c0c]/90 p-5 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-8"
+        className="rounded-3xl border border-white/10 bg-[#0c0c0c]/90 p-4 sm:p-7 shadow-2xl backdrop-blur-2xl"
       >
-        {/* 1. Service Selection */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
-            <Scissors className="h-4 w-4 text-white" />
-            <h2 className="text-sm font-bold text-white">۱. انتخاب خدمت</h2>
+        {/* Wizard Header & Breadcrumbs */}
+        <div className="mb-6 border-b border-white/10 pb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                رزرو وقت آنلاین
+              </h2>
+            </div>
+            <span className="text-xs text-neutral-400 font-mono">
+              مرحله {step} از ۴
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {SERVICES.map((service) => {
-              const isSelected = selectedService === service.id;
+          {/* Stepper Progress Bar */}
+          <div className="grid grid-cols-4 gap-2">
+            {stepsMeta.map((s) => {
+              const isCurrent = step === s.num;
+              const isCompleted = step > s.num;
+              const Icon = s.icon;
+
               return (
-                <label
-                  key={service.id}
-                  className={`group relative flex cursor-pointer items-center justify-between rounded-2xl border p-4 transition-all duration-200 ${
-                    isSelected
-                      ? "border-white bg-white/[0.08] shadow-[0_0_20px_rgba(255,255,255,0.06)]"
-                      : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+                <button
+                  key={s.num}
+                  type="button"
+                  onClick={() => {
+                    if (s.num < step) setStep(s.num as Step);
+                  }}
+                  disabled={s.num > step}
+                  className={`group relative flex items-center justify-center sm:justify-start gap-2 rounded-xl px-2 sm:px-3 py-2 text-xs transition-all ${
+                    isCurrent
+                      ? "bg-white text-black font-bold shadow-[0_0_15px_rgba(255,255,255,0.25)]"
+                      : isCompleted
+                      ? "bg-white/10 text-white hover:bg-white/15 cursor-pointer"
+                      : "bg-white/[0.02] text-neutral-500 cursor-not-allowed opacity-60"
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <input
-                      type="radio"
-                      name="service"
-                      value={service.id}
-                      checked={isSelected}
-                      onChange={() => handleServiceChange(service.id)}
-                      className="sr-only"
-                    />
-                    <div
-                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
-                        isSelected ? "border-white" : "border-neutral-600"
-                      }`}
-                    >
-                      {isSelected && (
-                        <div className="h-2 w-2 rounded-full bg-white" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white">{service.name}</p>
-                      {service.duration ? (
-                        <p className="mt-0.5 text-[11px] text-neutral-400">
-                          {service.duration}
-                        </p>
-                      ) : null}
-                    </div>
+                  <div
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-mono ${
+                      isCurrent
+                        ? "bg-black text-white font-bold"
+                        : isCompleted
+                        ? "bg-white/20 text-white"
+                        : "bg-white/5 text-neutral-500"
+                    }`}
+                  >
+                    {isCompleted ? <Check className="h-2.5 w-2.5" /> : s.num}
                   </div>
-
-                  <span className="font-mono text-xs font-bold text-white shrink-0 text-left mr-2">
-                    {service.price}
-                  </span>
-                </label>
+                  <span className="hidden sm:inline truncate">{s.label}</span>
+                </button>
               );
             })}
           </div>
         </div>
 
-        {/* 2. Date & Time Selection (Side by Side on Desktop) */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
-            <Calendar className="h-4 w-4 text-white" />
-            <h2 className="text-sm font-bold text-white">۲. روز و ساعت نوبت</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
-            {/* Calendar */}
-            <div className="flex min-h-[320px] flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white">
-                    تقویم نوبت‌دهی
-                  </span>
-                  <span className="text-[10px] text-neutral-400 mt-0.5">
-                    روز مورد نظر خود را انتخاب کنید
-                  </span>
-                </div>
-                {selectedDate ? (
-                  <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-white font-mono">
-                    {formatPersianDate(selectedDate)}
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-neutral-500 font-mono">
-                    انتخاب نشده
-                  </span>
-                )}
+        {/* ========================================================================= */}
+        {/* STEP 1: Rolling 7-Day Calendar Strip */}
+        {/* ========================================================================= */}
+        {step === 1 && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-white" />
+                  <span>روز مورد نظر خود را انتخاب کنید</span>
+                </h3>
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  نوبت‌دهی برای ۷ روز آینده (از شنبه تا جمعه)
+                </p>
               </div>
 
-              <div className="flex flex-1 items-center justify-center py-1">
-                <DayPicker
-                  mode="single"
-                  locale={faIR}
-                  dir="rtl"
-                  navLayout="around"
-                  startMonth={new Date(`${effectiveMinDate}T00:00:00`)}
-                  selected={selectedDate}
-                  onSelect={(day) => {
-                    if (!day) return;
-                    setSelectedDate(day);
-                    const year = day.getFullYear();
-                    const month = String(day.getMonth() + 1).padStart(2, "0");
-                    const dayNumber = String(day.getDate()).padStart(2, "0");
-                    const dateStr = `${year}-${month}-${dayNumber}`;
-                    setDate(dateStr);
-                    setSelectedTime("");
-                    trackClientEvent("date_select", { date: dateStr });
-                  }}
-                  disabled={{
-                    before: new Date(`${effectiveMinDate}T00:00:00`),
-                  }}
-                  components={{
-                    Chevron: DayPickerChevron,
-                  }}
-                />
-              </div>
-
-              {/* Legend Footer */}
-              <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-center gap-4 text-[10px] text-neutral-400">
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2 items-center justify-center">
-                    <span className="h-1.5 w-1.5 rounded-full bg-white ring-2 ring-white/40" />
-                  </span>
-                  <span>امروز</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm bg-white shadow-[0_0_6px_rgba(255,255,255,0.7)]" />
-                  <span className="text-neutral-200 font-medium">انتخاب شده</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-neutral-500">
-                  <span className="h-2 w-2 rounded-sm bg-neutral-800" />
-                  <span>غیرقابل رزرو</span>
-                </div>
+              {/* Week switcher */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] p-1">
+                <button
+                  type="button"
+                  onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
+                  disabled={weekOffset === 0}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium text-neutral-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  title="هفته قبل"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>هفته قبل</span>
+                </button>
+                <div className="h-3 w-[1px] bg-white/10" />
+                <button
+                  type="button"
+                  onClick={() => setWeekOffset((w) => Math.min(4, w + 1))}
+                  disabled={weekOffset >= 4}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium text-neutral-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  title="هفته بعد"
+                >
+                  <span>هفته بعد</span>
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
-            {/* Time Slots */}
-            <div className="flex min-h-[320px] flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white">
-                    {selectedDate
-                      ? formatPersianDate(selectedDate)
-                      : "انتخاب ساعت"}
-                  </span>
-                  <span className="text-[10px] text-neutral-400 mt-0.5">
-                    {isHaircut
-                      ? "نوبت‌های سر ساعت (اصلاح مو)"
-                      : "نوبت‌های بعد از اصلاح (خدمات جانبی)"}
-                  </span>
-                </div>
-                {loading && (
-                  <span className="text-[11px] text-neutral-400 font-mono">
-                    در حال بررسی...
-                  </span>
-                )}
-              </div>
+            {/* 7-Day Rolling Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+              {rollingDays.map((d) => {
+                const isSelected = date === d.isoDate;
 
-              {!date ? (
-                <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-neutral-500">
-                  ابتدا از تقویم روز مورد نظر را انتخاب کنید.
-                </div>
-              ) : availability.isAllDayUnavailable ? (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-center space-y-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400">
-                    <Ban className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-red-300">
-                      آرایشگر در این تاریخ در سالن حضور ندارد
-                    </h3>
-                    <p className="mt-1 text-xs text-neutral-400">
-                      امکان رزرو نوبت برای این تاریخ وجود ندارد.
-                    </p>
-                  </div>
-                  {availability.allDayNote && (
-                    <div className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-xs text-neutral-200">
-                      <span className="font-bold text-amber-400 block mb-1">
-                        پیام آرایشگر:
+                return (
+                  <button
+                    key={d.isoDate}
+                    type="button"
+                    onClick={() => handleSelectDate(d.isoDate)}
+                    className={`relative flex flex-col items-center justify-center rounded-2xl border p-3.5 text-center transition-all ${
+                      isSelected
+                        ? "border-white bg-white text-black font-bold shadow-[0_0_20px_rgba(255,255,255,0.25)] scale-[1.02]"
+                        : "border-white/10 bg-white/[0.03] text-neutral-300 hover:border-white/30 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {/* Badge for Today / Tomorrow */}
+                    {d.isToday && (
+                      <span
+                        className={`mb-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          isSelected
+                            ? "bg-black text-white"
+                            : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        }`}
+                      >
+                        امروز
                       </span>
-                      <span>{availability.allDayNote}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {date === iranNow.date &&
-                    slots.length > 0 &&
-                    slots.every((s) => s.isBooked || s.isPassed || s.isUnavailable) && (
-                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center text-xs text-amber-300">
-                        تمامی نوبت‌های امروز به پایان رسیده یا رزرو شده‌اند. لطفاً روز دیگری را انتخاب کنید.
-                      </div>
+                    )}
+                    {d.isTomorrow && (
+                      <span
+                        className={`mb-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          isSelected
+                            ? "bg-black text-white"
+                            : "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                        }`}
+                      >
+                        فردا
+                      </span>
                     )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {slots.map((slot) => {
-                      const isSelected = activeSelectedTime === slot.time;
-                      const isSlotDisabled =
-                        slot.isBooked || slot.isPassed || slot.isUnavailable || loading;
+                    <span
+                      className={`text-xs ${
+                        isSelected ? "font-bold text-black" : "text-neutral-400"
+                      }`}
+                    >
+                      {d.weekday}
+                    </span>
 
-                      return (
-                        <label
-                          key={slot.hour}
-                          className={
-                            isSlotDisabled
-                              ? "cursor-not-allowed opacity-40"
-                              : "cursor-pointer"
-                          }
-                        >
-                          <input
+                    <span
+                      className={`mt-1 font-mono text-sm ${
+                        isSelected ? "font-extrabold text-black" : "font-bold text-white"
+                      }`}
+                    >
+                      {d.dayMonth}
+                    </span>
+
+                    {isSelected && (
+                      <div className="absolute top-2 left-2 flex h-4 w-4 items-center justify-center rounded-full bg-black text-white">
+                        <Check className="h-2.5 w-2.5" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Date Summary & Next Button */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <div className="text-xs text-neutral-300">
+                روز انتخاب شده:{" "}
+                <span className="font-bold text-white">
+                  {selectedDayInfo?.fullPersian || formatPersianDate(date)}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={!date}
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-xs font-bold text-black shadow-lg hover:bg-neutral-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <span>مرحله بعد: انتخاب خدمت</span>
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 2: Service Selection */}
+        {/* ========================================================================= */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Scissors className="h-4 w-4 text-white" />
+                  <span>انتخاب نوع خدمت</span>
+                </h3>
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  نوبت برای:{" "}
+                  <span className="text-white font-medium">
+                    {selectedDayInfo?.fullPersian || formatPersianDate(date)}
+                  </span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span>تغییر تاریخ</span>
+              </button>
+            </div>
+
+            {/* Services List */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {SERVICES.map((service) => {
+                const isSelected = selectedService === service.id;
+                return (
+                  <label
+                    key={service.id}
+                    onClick={() => handleSelectService(service.id)}
+                    className={`group relative flex cursor-pointer items-center justify-between rounded-2xl border p-4 transition-all duration-200 ${
+                      isSelected
+                        ? "border-white bg-white/[0.08] shadow-[0_0_20px_rgba(255,255,255,0.06)]"
+                        : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
+                          isSelected ? "border-white" : "border-neutral-600"
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="h-2 w-2 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white">{service.name}</p>
+                        {service.duration ? (
+                          <p className="mt-0.5 text-[11px] text-neutral-400">
+                            {service.duration}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <span className="font-mono text-xs font-bold text-white shrink-0 text-left mr-2">
+                      {service.price}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                <span>مرحله قبل</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-bold text-black shadow-lg hover:bg-neutral-200 transition active:scale-95"
+              >
+                <span>مرحله بعد: انتخاب ساعت</span>
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 3: Time Slot Selection */}
+        {/* ========================================================================= */}
+        {step === 3 && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-white" />
+                  <span>انتخاب ساعت نوبت</span>
+                </h3>
+                <div className="flex items-center gap-2 mt-1 text-[11px] text-neutral-400">
+                  <span>{selectedDayInfo?.fullPersian || formatPersianDate(date)}</span>
+                  <span>•</span>
+                  <span>{currentServiceObj.name}</span>
+                </div>
+              </div>
+
+              {loadingAvailability && (
+                <span className="text-xs text-neutral-400 font-mono animate-pulse">
+                  در حال بررسی نوبت‌ها...
+                </span>
+              )}
+            </div>
+
+            {/* Barber all-day unavailable */}
+            {availability.isAllDayUnavailable ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-center space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+                  <Ban className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-red-300">
+                    آرایشگر در این تاریخ در سالن حضور ندارد
+                  </h4>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    امکان رزرو نوبت برای این تاریخ وجود ندارد. لطفاً روز دیگری را انتخاب نمایید.
+                  </p>
+                </div>
+                {availability.allDayNote && (
+                  <div className="w-full max-w-md rounded-xl border border-white/10 bg-black/60 p-3 text-xs text-neutral-200">
+                    <span className="font-bold text-amber-400 block mb-1">
+                      پیام آرایشگر:
+                    </span>
+                    <span>{availability.allDayNote}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                >
+                  بازگشت به تقویم و انتخاب روز دیگر
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Notice if all today slots have passed */}
+                {date === iranNow.date &&
+                  slots.length > 0 &&
+                  slots.every((s) => s.isBooked || s.isPassed || s.isUnavailable) && (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center text-xs text-amber-300">
+                      تمامی نوبت‌های امروز به پایان رسیده یا رزرو شده‌اند. لطفاً روز دیگری را از تقویم انتخاب فرمایید.
+                    </div>
+                  )}
+
+                {/* Morning Slots */}
+                {morningSlots.length > 0 && (
+                  <div>
+                    <div className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-neutral-400">
+                      <span>نوبت‌های صبح (۰۹:۰۰ الی ۱۳:۰۰)</span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                      {morningSlots.map((slot) => {
+                        const isSelected = activeSelectedTime === slot.time;
+                        const isSlotDisabled =
+                          slot.isBooked || slot.isPassed || slot.isUnavailable || loadingAvailability;
+
+                        return (
+                          <button
+                            key={slot.hour}
+                            type="button"
                             disabled={isSlotDisabled}
-                            type="radio"
-                            name="time"
-                            value={slot.time}
-                            checked={isSelected}
-                            onChange={() => {
-                              setSelectedTime(slot.time);
-                              trackClientEvent("slot_select", {
-                                service: selectedService,
-                                date,
-                                time: slot.time,
-                              });
-                            }}
-                            className="sr-only"
-                          />
-                          <div
+                            onClick={() => handleSelectTime(slot.time)}
                             className={`flex min-h-[46px] flex-col items-center justify-center rounded-xl border p-2 font-mono text-xs transition-all ${
                               isSelected
-                                ? "border-white bg-white font-bold text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+                                ? "border-white bg-white font-bold text-black shadow-[0_0_15px_rgba(255,255,255,0.3)] scale-105"
                                 : slot.isUnavailable
-                                ? "border-red-500/20 bg-red-500/5 text-neutral-500 line-through"
+                                ? "border-red-500/20 bg-red-500/5 text-neutral-500 line-through cursor-not-allowed opacity-40"
                                 : slot.isBooked
-                                ? "border-white/5 bg-transparent text-neutral-600 line-through"
+                                ? "border-white/5 bg-transparent text-neutral-600 line-through cursor-not-allowed opacity-40"
                                 : slot.isPassed
-                                ? "border-white/5 bg-transparent text-neutral-600 line-through"
-                                : "border-white/10 bg-white/[0.03] text-neutral-200 hover:border-white/30 hover:bg-white/[0.06]"
+                                ? "border-white/5 bg-transparent text-neutral-600 line-through cursor-not-allowed opacity-40"
+                                : "border-white/10 bg-white/[0.03] text-neutral-200 hover:border-white/30 hover:bg-white/[0.06] cursor-pointer"
                             }`}
                           >
                             <span>{slot.time}</span>
@@ -562,169 +744,331 @@ export default function BookingForm({ minDate }: { minDate: string }) {
                               </span>
                             ) : slot.isPassed ? (
                               <span className="no-underline text-[9px] text-neutral-500 font-sans mt-0.5">
-                                زمان گذشته
+                                گذشته
                               </span>
                             ) : null}
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-
-                  {/* Notes for specific blocked hours */}
-                  {slots.some((s) => s.isUnavailable && s.unavailableNote) && (
-                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs space-y-2">
-                      <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                        <Info className="h-3.5 w-3.5" />
-                        <span>یادداشت آرایشگر برای ساعات این روز:</span>
-                      </div>
-                      <div className="space-y-1">
-                        {slots
-                          .filter((s) => s.isUnavailable && s.unavailableNote)
-                          .map((s) => (
-                            <div key={s.hour} className="text-neutral-300 text-[11px] flex items-start gap-1">
-                              <span className="font-mono text-amber-300 shrink-0">• ساعت {s.time}:</span>
-                              <span>{s.unavailableNote}</span>
-                            </div>
-                          ))}
-                      </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+                  </div>
+                )}
 
-        {/* 3. Customer Info */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
-            <User className="h-4 w-4 text-white" />
-            <h2 className="text-sm font-bold text-white">۳. مشخصات شما</h2>
-          </div>
+                {/* Evening Slots */}
+                {eveningSlots.length > 0 && (
+                  <div>
+                    <div className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-neutral-400">
+                      <span>نوبت‌های عصر و شب (۱۶:۰۰ الی ۲۱:۰۰)</span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                      {eveningSlots.map((slot) => {
+                        const isSelected = activeSelectedTime === slot.time;
+                        const isSlotDisabled =
+                          slot.isBooked || slot.isPassed || slot.isUnavailable || loadingAvailability;
 
-          {hasSavedProfile ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-white" />
-                  <span className="text-sm font-bold text-white">{profile.name}</span>
-                  <span className="font-mono text-xs text-neutral-400" dir="ltr">
-                    ({profile.phone})
-                  </span>
-                </div>
+                        return (
+                          <button
+                            key={slot.hour}
+                            type="button"
+                            disabled={isSlotDisabled}
+                            onClick={() => handleSelectTime(slot.time)}
+                            className={`flex min-h-[46px] flex-col items-center justify-center rounded-xl border p-2 font-mono text-xs transition-all ${
+                              isSelected
+                                ? "border-white bg-white font-bold text-black shadow-[0_0_15px_rgba(255,255,255,0.3)] scale-105"
+                                : slot.isUnavailable
+                                ? "border-red-500/20 bg-red-500/5 text-neutral-500 line-through cursor-not-allowed opacity-40"
+                                : slot.isBooked
+                                ? "border-white/5 bg-transparent text-neutral-600 line-through cursor-not-allowed opacity-40"
+                                : slot.isPassed
+                                ? "border-white/5 bg-transparent text-neutral-600 line-through cursor-not-allowed opacity-40"
+                                : "border-white/10 bg-white/[0.03] text-neutral-200 hover:border-white/30 hover:bg-white/[0.06] cursor-pointer"
+                            }`}
+                          >
+                            <span>{slot.time}</span>
+                            {slot.isUnavailable ? (
+                              <span className="no-underline text-[9px] text-red-400/90 font-sans mt-0.5">
+                                عدم حضور
+                              </span>
+                            ) : slot.isBooked ? (
+                              <span className="no-underline text-[9px] text-neutral-500 font-sans mt-0.5">
+                                رزرو شده
+                              </span>
+                            ) : slot.isPassed ? (
+                              <span className="no-underline text-[9px] text-neutral-500 font-sans mt-0.5">
+                                گذشته
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
-                {birthdayStatus?.discountEligible && (
-                  <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-purple-300">
-                    <Sparkles className="h-3.5 w-3.5 text-purple-400 animate-pulse" />
-                    <span>۵۰٪ تخفیف هفته تولد برای این نوبت فعال است!</span>
+                {/* Notes for specific blocked hours */}
+                {slots.some((s) => s.isUnavailable && s.unavailableNote) && (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs space-y-2">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                      <Info className="h-3.5 w-3.5" />
+                      <span>یادداشت آرایشگر برای ساعات این روز:</span>
+                    </div>
+                    <div className="space-y-1">
+                      {slots
+                        .filter((s) => s.isUnavailable && s.unavailableNote)
+                        .map((s) => (
+                          <div key={s.hour} className="text-neutral-300 text-[11px] flex items-start gap-1">
+                            <span className="font-mono text-amber-300 shrink-0">• ساعت {s.time}:</span>
+                            <span>{s.unavailableNote}</span>
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Navigation buttons */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                <span>مرحله قبل</span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="text-xs text-neutral-300 hover:text-white underline transition"
+                onClick={() => setStep(4)}
+                disabled={!activeSelectedTime}
+                className="flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-bold text-black shadow-lg hover:bg-neutral-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                تغییر مشخصات
+                <span>مرحله بعد: مشخصات و ثبت</span>
+                <ArrowLeft className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="customer-name" className="block text-xs font-medium text-neutral-300 mb-1">
-                    نام و نام خانوادگی
-                  </label>
-                  <input
-                    id="customer-name"
-                    required
-                    type="text"
-                    maxLength={80}
-                    value={inputName}
-                    onChange={(e) => setInputName(e.target.value)}
-                    placeholder="مثال: علی رضایی"
-                    className="w-full rounded-xl border border-white/10 bg-black/60 px-3.5 py-2.5 text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="customer-phone" className="block text-xs font-medium text-neutral-300 mb-1">
-                    شماره موبایل
-                  </label>
-                  <input
-                    id="customer-phone"
-                    required
-                    type="tel"
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={inputPhone}
-                    onChange={(e) => setInputPhone(e.target.value)}
-                    placeholder="09123456789"
-                    className="w-full rounded-xl border border-white/10 bg-black/60 px-3.5 py-2.5 text-left font-mono text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
-                  />
-                </div>
-              </div>
-
-              {/* Optional Birthday for 50% discount */}
-              <div className="pt-1">
-                {!showBirthdayPicker ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowBirthdayPicker(true)}
-                    className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition"
-                  >
-                    <Gift className="h-3.5 w-3.5 text-purple-400" />
-                    <span>افزودن تاریخ تولد (۵۰٪ تخفیف هفته تولد)</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                ) : (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-white flex items-center gap-1.5">
-                        <Gift className="h-3.5 w-3.5 text-purple-400" />
-                        تاریخ تولد (اختیاری)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowBirthdayPicker(false)}
-                        className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1"
-                      >
-                        <span>بستن</span>
-                        <ChevronUp className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <BirthdayPicker
-                      value={inputBirthday}
-                      onChange={(val) => setInputBirthday(val)}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Form Error Toast */}
-        {formError && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
-            {formError}
           </div>
         )}
 
-        {/* 4. Submit Button */}
-        <button
-          type="submit"
-          disabled={!selectedDate || !activeSelectedTime || isPending}
-          className="flex w-full items-center justify-center rounded-2xl bg-white py-4 text-sm font-bold text-black shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed transition"
-        >
-          <span>
-            {isPending
-              ? "در حال ثبت رزرو..."
-              : "رزرو وقت و دریافت نوبت"}
-          </span>
-        </button>
+        {/* ========================================================================= */}
+        {/* STEP 4: Customer Details & Final Confirmation */}
+        {/* ========================================================================= */}
+        {step === 4 && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <User className="h-4 w-4 text-white" />
+                <span>مشخصات و ثبت نهایی نوبت</span>
+              </h3>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                اطلاعات نوبت خود را بررسی و مشخصات تماس را جهت دریافت پیامک تایید وارد نمایید.
+              </p>
+            </div>
+
+            {/* Order Summary Slab */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                <span className="text-xs font-bold text-white">خلاصه رزرو نوبت</span>
+                <span className="font-mono text-xs font-bold text-emerald-400">
+                  {currentServiceObj.price}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Service */}
+                <div className="flex items-center justify-between sm:flex-col sm:items-start p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-neutral-400 text-[11px]">خدمت انتخابی:</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-bold text-white">{currentServiceObj.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="text-neutral-400 hover:text-white"
+                      title="ویرایش خدمت"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Date */}
+                <div className="flex items-center justify-between sm:flex-col sm:items-start p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-neutral-400 text-[11px]">تاریخ نوبت:</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-bold text-white">
+                      {selectedDayInfo?.fullPersian || formatPersianDate(date)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="text-neutral-400 hover:text-white"
+                      title="ویرایش تاریخ"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div className="flex items-center justify-between sm:flex-col sm:items-start p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-neutral-400 text-[11px]">ساعت نوبت:</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-mono font-bold text-white">
+                      ساعت {activeSelectedTime}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setStep(3)}
+                      className="text-neutral-400 hover:text-white"
+                      title="ویرایش ساعت"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Contact Section */}
+            {hasSavedProfile ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span className="text-sm font-bold text-white">{profile.name}</span>
+                    <span className="font-mono text-xs text-neutral-400" dir="ltr">
+                      ({profile.phone})
+                    </span>
+                  </div>
+
+                  {birthdayStatus?.discountEligible && (
+                    <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-400 animate-pulse" />
+                      <span>۵۰٪ تخفیف هفته تولد برای این نوبت فعال است!</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="text-xs text-neutral-300 hover:text-white underline transition"
+                >
+                  تغییر مشخصات
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="customer-name"
+                      className="block text-xs font-medium text-neutral-300 mb-1"
+                    >
+                      نام و نام خانوادگی
+                    </label>
+                    <input
+                      id="customer-name"
+                      required
+                      type="text"
+                      maxLength={80}
+                      value={inputName}
+                      onChange={(e) => setInputName(e.target.value)}
+                      placeholder="مثال: علی رضایی"
+                      className="w-full rounded-xl border border-white/10 bg-black/60 px-3.5 py-2.5 text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="customer-phone"
+                      className="block text-xs font-medium text-neutral-300 mb-1"
+                    >
+                      شماره موبایل
+                    </label>
+                    <input
+                      id="customer-phone"
+                      required
+                      type="tel"
+                      dir="ltr"
+                      inputMode="numeric"
+                      value={inputPhone}
+                      onChange={(e) => setInputPhone(e.target.value)}
+                      placeholder="09123456789"
+                      className="w-full rounded-xl border border-white/10 bg-black/60 px-3.5 py-2.5 text-left font-mono text-sm text-white placeholder-neutral-600 outline-none focus:border-white focus:ring-1 focus:ring-white transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Optional Birthday */}
+                <div className="pt-1">
+                  {!showBirthdayPicker ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowBirthdayPicker(true)}
+                      className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition"
+                    >
+                      <Gift className="h-3.5 w-3.5 text-purple-400" />
+                      <span>افزودن تاریخ تولد (۵۰٪ تخفیف هفته تولد)</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-white flex items-center gap-1.5">
+                          <Gift className="h-3.5 w-3.5 text-purple-400" />
+                          تاریخ تولد (اختیاری)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowBirthdayPicker(false)}
+                          className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1"
+                        >
+                          <span>بستن</span>
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <BirthdayPicker
+                        value={inputBirthday}
+                        onChange={(val) => setInputBirthday(val)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {formError && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                {formError}
+              </div>
+            )}
+
+            {/* Navigation & Submit CTA */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                <span>مرحله قبل</span>
+              </button>
+
+              <button
+                type="submit"
+                disabled={isPending || !activeSelectedTime || !date}
+                className="flex w-full sm:flex-1 items-center justify-center rounded-2xl bg-white py-3.5 text-sm font-bold text-black shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                <span>
+                  {isPending ? "در حال ثبت نوبت..." : "تایید و ثبت نهایی نوبت"}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
       </form>
     </>
   );
