@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getSql } from "@/lib/db";
 import { SERVICES, iranToday, formatPersianDate } from "@/lib/booking";
 import { isAdmin } from "@/lib/admin";
@@ -47,6 +48,14 @@ import AdminUnavailableForm from "./AdminUnavailableForm";
 import AdminSmsSection from "./AdminSmsSection";
 import { getBusinessAnalytics, type TimeRange } from "@/lib/analytics";
 import { getUnavailableTimes } from "@/lib/unavailable";
+
+export const metadata: Metadata = {
+  title: "پنل مدیریت",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export const dynamic = "force-dynamic";
 

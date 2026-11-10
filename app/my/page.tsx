@@ -6,6 +6,10 @@ import { getShopConfig } from "@/lib/shop";
 export const metadata: Metadata = {
   title: "نوبت‌های من و پیگیری رزرو",
   description: "مشاهده نوبت‌های فعال، سابقه مراجعات و لغو آنلاین نوبت در مو کات",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default async function MyBookingsPage() {

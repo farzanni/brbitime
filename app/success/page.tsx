@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getSql } from "@/lib/db";
 import { SERVICES, formatPersianDate } from "@/lib/booking";
@@ -5,6 +6,14 @@ import { getShopConfig } from "@/lib/shop";
 import BrandLogo from "../BrandLogo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "نتیجه رزرو نوبت",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 type Appointment = {
   service: string;
